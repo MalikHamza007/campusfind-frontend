@@ -1,0 +1,23 @@
+<div class="lg:hidden flex items-center gap-2 font-extrabold text-xl mb-8"><img src="favicon.svg" alt="" width="30" height="30" />CampusFind</div>
+<h1 class="text-3xl font-extrabold m-0">Sign in</h1>
+<p class="cf-muted mt-2 mb-8">Use your university email to report, search and claim items.</p>
+
+@if (expired()) { <p-message severity="info" styleClass="mb-4" text="Your session ended. Sign in again to continue." /> }
+@if (error()) { <p-message severity="error" styleClass="mb-4" [text]="error()!" role="alert" /> }
+
+<form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-5" novalidate>
+  <div class="cf-field">
+    <label for="email">University email</label>
+    <input pInputText id="email" type="email" formControlName="email" autocomplete="email" placeholder="name@campusfind.edu.pk" [invalid]="form.controls.email.touched && form.controls.email.invalid" />
+    @if (form.controls.email.touched && form.controls.email.errors?.['required']) { <span class="cf-error">Enter your email.</span> }
+    @if (form.controls.email.touched && form.controls.email.errors?.['email']) { <span class="cf-error">Enter a valid email address.</span> }
+  </div>
+  <div class="cf-field">
+    <label for="password">Password</label>
+    <p-password inputId="password" formControlName="password" [feedback]="false" [toggleMask]="true" autocomplete="current-password" [fluid]="true" [invalid]="form.controls.password.touched && form.controls.password.invalid" />
+    @if (form.controls.password.touched && form.controls.password.invalid) { <span class="cf-error">Enter your password.</span> }
+  </div>
+  <p-button type="submit" label="Sign in" icon="pi pi-sign-in" [loading]="loading()" [fluid]="true" size="large" />
+</form>
+
+<p class="mt-8 text-sm cf-muted">New student? <a routerLink="/register" class="font-semibold" style="color: var(--p-primary-600)">Create an account</a></p>

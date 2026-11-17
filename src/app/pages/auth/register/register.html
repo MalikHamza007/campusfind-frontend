@@ -1,0 +1,46 @@
+<div class="lg:hidden flex items-center gap-2 font-extrabold text-xl mb-6"><img src="favicon.svg" alt="" width="30" height="30" />CampusFind</div>
+<h1 class="text-3xl font-extrabold m-0">Create your account</h1>
+<p class="cf-muted mt-2 mb-6">Registration is for enrolled students. Use your university email.</p>
+@if (error()) { <p-message severity="error" styleClass="mb-4" [text]="error()!" role="alert" /> }
+
+<form [formGroup]="form" (ngSubmit)="submit()" class="grid grid-cols-1 sm:grid-cols-2 gap-4" novalidate>
+  <div class="cf-field sm:col-span-2">
+    <label for="fullName">Full name</label>
+    <input pInputText id="fullName" formControlName="fullName" autocomplete="name" [invalid]="show('fullName')" />
+    @if (show('fullName')) { <span class="cf-error">Enter your name (2–80 characters).</span> }
+  </div>
+  <div class="cf-field sm:col-span-2">
+    <label for="email">University email</label>
+    <input pInputText id="email" type="email" formControlName="email" autocomplete="email" [placeholder]="'name@' + domain" [invalid]="show('email')" />
+    @if (form.controls.email.touched && form.controls.email.errors?.['domain']) { <span class="cf-error">Use your &#64;{{ domain }} email.</span> }
+    @else if (form.controls.email.touched && form.controls.email.errors?.['server']) { <span class="cf-error">{{ form.controls.email.errors?.['server'] }}</span> }
+    @else if (show('email')) { <span class="cf-error">Enter a valid email address.</span> }
+  </div>
+  <div class="cf-field">
+    <label for="studentId">Student ID</label>
+    <input pInputText id="studentId" formControlName="studentId" placeholder="GSU-2024-CS-041" class="uppercase" [invalid]="show('studentId')" />
+    @if (form.controls.studentId.errors?.['server']) { <span class="cf-error">{{ form.controls.studentId.errors?.['server'] }}</span> }
+    @else if (show('studentId')) { <span class="cf-error">Format: GSU-2024-CS-041</span> }
+  </div>
+  <div class="cf-field">
+    <label for="department">Department</label>
+    <p-select inputId="department" formControlName="department" [options]="departments" placeholder="Choose" [fluid]="true" [invalid]="show('department')" />
+    @if (show('department')) { <span class="cf-error">Choose your department.</span> }
+  </div>
+  <div class="cf-field sm:col-span-2">
+    <label for="phone">Phone <span class="cf-muted font-normal">(optional, only visible to the office)</span></label>
+    <input pInputText id="phone" formControlName="phone" autocomplete="tel" placeholder="+92 300 1234 567" [invalid]="show('phone')" />
+    @if (show('phone')) { <span class="cf-error">Enter a valid phone number.</span> }
+  </div>
+  <div class="cf-field sm:col-span-2">
+    <label for="password">Password</label>
+    <p-password inputId="password" formControlName="password" [feedback]="false" [toggleMask]="true" autocomplete="new-password" [fluid]="true" [invalid]="show('password')" />
+    <ul class="m-0 p-0 list-none grid grid-cols-2 gap-x-3 gap-y-1 text-xs mt-1" aria-label="Password requirements">
+      @for (r of rules; track r.key) {
+        <li class="flex items-center gap-1.5" [style.color]="passed(r.test) ? 'var(--cf-found)' : 'var(--cf-muted)'"><i [class]="passed(r.test) ? 'pi pi-check-circle' : 'pi pi-circle'" class="text-[11px]"></i>{{ r.label }}</li>
+      }
+    </ul>
+  </div>
+  <p-button type="submit" label="Create account" icon="pi pi-user-plus" [loading]="loading()" [fluid]="true" size="large" class="sm:col-span-2 mt-2" />
+</form>
+<p class="mt-6 text-sm cf-muted">Already registered? <a routerLink="/login" class="font-semibold" style="color: var(--p-primary-600)">Sign in</a></p>

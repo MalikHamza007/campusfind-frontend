@@ -1,0 +1,70 @@
+<a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:p-2 focus:rounded">Skip to content</a>
+
+<ng-template #sidebarContent let-mobile>
+  <div class="flex items-center gap-3 px-4 h-16 shrink-0">
+    <img src="favicon.svg" alt="" width="30" height="30" />
+    @if (!collapsed() || mobile) { <span class="font-extrabold text-lg tracking-tight">CampusFind</span> }
+  </div>
+  <nav class="flex-1 overflow-y-auto px-3 pb-4" aria-label="Main">
+    @for (group of nav(); track group.label) {
+      <div class="mt-4">
+        @if (!collapsed() || mobile) { <p class="nav-group">{{ group.label }}</p> } @else { <hr class="nav-sep" /> }
+        @for (item of group.items; track item.route) {
+          <a [routerLink]="item.route" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: !!item.exact }" class="nav-link"
+             [pTooltip]="collapsed() && !mobile ? item.label : ''" tooltipPosition="right" (click)="mobileOpen.set(false)">
+            <i [class]="item.icon"></i>
+            @if (!collapsed() || mobile) { <span>{{ item.label }}</span> }
+          </a>
+        }
+      </div>
+    }
+  </nav>
+  @if (!collapsed() || mobile) {
+    <div class="m-3 p-3 rounded-xl text-xs leading-relaxed help-box">
+      <strong class="block mb-1">Lost &amp; Found Office</strong>
+      Admin Block, ground floor · Mon–Fri 9:00–16:00. Bring your university ID to collect an item.
+    </div>
+  }
+</ng-template>
+
+<div class="min-h-screen flex">
+  <aside class="sidebar hidden lg:flex flex-col" [class.collapsed]="collapsed()">
+    <ng-container *ngTemplateOutlet="sidebarContent; context: { $implicit: false }" />
+  </aside>
+
+  <p-drawer [visible]="mobileOpen()" (visibleChange)="mobileOpen.set($event)" position="left" [style]="{ width: '280px' }" styleClass="mobile-drawer" [showCloseIcon]="true" ariaLabel="Navigation">
+    <div class="flex flex-col h-full -mx-4 -mt-4"><ng-container *ngTemplateOutlet="sidebarContent; context: { $implicit: true }" /></div>
+  </p-drawer>
+
+  <div class="flex-1 min-w-0 flex flex-col">
+    <header class="topbar">
+      <p-button icon="pi pi-bars" [text]="true" severity="secondary" class="lg:hidden" (onClick)="mobileOpen.set(true)" ariaLabel="Open navigation" />
+      <p-button [icon]="collapsed() ? 'pi pi-angle-double-right' : 'pi pi-angle-double-left'" [text]="true" severity="secondary" class="hidden lg:inline-flex" (onClick)="collapsed.set(!collapsed())" [ariaLabel]="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'" />
+      <nav aria-label="Breadcrumb" class="hidden sm:flex items-center gap-2 text-sm min-w-0">
+        <a routerLink="/dashboard" class="cf-muted no-underline hover:underline">Home</a>
+        @if (crumb() && crumb() !== 'Dashboard') { <i class="pi pi-angle-right text-xs cf-muted"></i><span class="font-semibold truncate">{{ crumb() }}</span> }
+      </nav>
+      <form class="ml-auto hidden md:block" (ngSubmit)="runSearch()" role="search">
+        <p-iconfield>
+          <p-inputicon styleClass="pi pi-search" />
+          <input pInputText [(ngModel)]="search" name="q" placeholder="Search items, codes, places" aria-label="Search the lost and found directory" class="w-72" />
+        </p-iconfield>
+      </form>
+      <div class="flex items-center gap-1 ml-auto md:ml-2">
+        <p-button [icon]="theme.dark() ? 'pi pi-sun' : 'pi pi-moon'" [text]="true" [rounded]="true" severity="secondary" (onClick)="theme.toggle()" [ariaLabel]="theme.dark() ? 'Switch to light mode' : 'Switch to dark mode'" [pTooltip]="theme.dark() ? 'Light mode' : 'Dark mode'" tooltipPosition="bottom" />
+        <button type="button" class="user-btn" (click)="menu.toggle($event)" aria-haspopup="menu" aria-label="Account menu">
+          <p-avatar [label]="initials()" shape="circle" styleClass="user-avatar" />
+          <span class="hidden sm:flex flex-col items-start leading-tight text-left">
+            <span class="text-sm font-semibold">{{ auth.user()?.fullName }}</span>
+            <span class="role-badge" [class.admin]="auth.isAdmin()">{{ auth.isAdmin() ? 'Administrator' : 'Student' }}</span>
+          </span>
+          <i class="pi pi-angle-down text-xs cf-muted hidden sm:inline"></i>
+        </button>
+        <p-menu #menu [model]="userMenu" [popup]="true" appendTo="body" />
+      </div>
+    </header>
+    <main id="main" class="flex-1 px-4 py-6 md:px-8 md:py-8 max-w-[1440px] w-full mx-auto">
+      <router-outlet />
+    </main>
+  </div>
+</div>
