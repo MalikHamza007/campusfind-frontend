@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { catchError, finalize, firstValueFrom, map, Observable, of, shareReplay, tap, timeout } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { User } from '../interfaces/models';
-import { can, Permission } from '../constants/permissions';
+import { can, isStaffRole, Permission, ROLE_ICON, ROLE_LABEL } from '../constants/permissions';
 
 interface AuthResponse { accessToken: string; user: User }
 
@@ -25,7 +25,11 @@ export class AuthService {
   readonly user = this._user.asReadonly();
   readonly isLoggedIn = computed(() => !!this._user());
   readonly role = computed(() => this._user()?.role);
-  readonly isAdmin = computed(() => this._user()?.role === 'admin');
+  /** Staff or super admin — anyone who works the lost & found queue. */
+  readonly isAdmin = computed(() => isStaffRole(this._user()?.role));
+  readonly isSuperAdmin = computed(() => this._user()?.role === 'super_admin');
+  readonly roleLabel = computed(() => { const r = this._user()?.role; return r ? ROLE_LABEL[r] : ''; });
+  readonly roleIcon = computed(() => { const r = this._user()?.role; return r ? ROLE_ICON[r] : 'pi pi-user'; });
 
   token(): string | null {
     return this.accessToken;

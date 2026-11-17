@@ -9,7 +9,7 @@
       <p-fileupload mode="basic" [customUpload]="true" [auto]="false" (onSelect)="avatar($event)" accept="image/jpeg,image/png,image/webp" [maxFileSize]="2097152" chooseLabel="Change photo" chooseIcon="pi pi-camera" [disabled]="uploadingAvatar()" />
       <span class="cf-hint">JPEG, PNG or WebP up to 2 MB</span>
       <div><h2 class="m-0 text-lg font-bold">{{ u.fullName }}</h2><p class="m-0 text-sm cf-muted">{{ u.email }}</p></div>
-      <div class="flex gap-2"><p-tag [value]="u.role === 'admin' ? 'Administrator' : 'Student'" [severity]="u.role === 'admin' ? 'contrast' : 'info'" [rounded]="true" /><p-tag [value]="u.studentId" severity="secondary" [rounded]="true" /></div>
+      <div class="flex gap-2"><p-tag [value]="roleLabel[u.role]" [icon]="roleIcon[u.role]" [severity]="roleSeverity[u.role]" [rounded]="true" /><p-tag [value]="u.studentId" severity="secondary" [rounded]="true" /></div>
       <p class="m-0 text-xs cf-muted">Member since {{ u.createdAt | date: 'MMMM y' }}</p>
     </section>
     <div class="flex flex-col gap-4">

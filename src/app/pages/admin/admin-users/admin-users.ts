@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TableModule, TableLazyLoadEvent } from 'primeng/table';
@@ -11,6 +11,10 @@ import { Tooltip } from 'primeng/tooltip';
 import { Skeleton } from 'primeng/skeleton';
 import { Tag } from 'primeng/tag';
 import { Avatar } from 'primeng/avatar';
+import { Menu } from 'primeng/menu';
+import { MenuItem } from 'primeng/api';
+import { ROLE_ICON, ROLE_LABEL, ROLE_SEVERITY } from '../../../core/constants/permissions';
+import { Role } from '../../../core/interfaces/models';
 import { ConfirmationService } from 'primeng/api';
 import { Subject, debounceTime } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -25,9 +29,9 @@ import { EmptyState, ErrorState } from '../../../shared/components/empty-state';
 
 @Component({
   selector: 'app-admin-users',
-  imports: [DatePipe, FormsModule, TableModule, Button, Select, InputText, IconField, InputIcon, Tooltip, Skeleton, Tag, Avatar, PageHeader, EmptyState, ErrorState],
+  imports: [DatePipe, FormsModule, TableModule, Button, Select, InputText, IconField, InputIcon, Tooltip, Skeleton, Tag, Avatar, Menu, PageHeader, EmptyState, ErrorState],
   template: `
-    <app-page-header title="Users" subtitle="Students register themselves. Promote trusted staff to administrator, or deactivate an account — deactivation signs the person out everywhere." />
+    <app-page-header title="Users" [subtitle]="auth.isSuperAdmin() ? 'Students register themselves. Make office staff Staff so they can process claims, or deactivate an account. Deactivation signs the person out everywhere.' : 'Students register themselves. You can deactivate or reactivate student accounts; staff accounts and roles are managed by the super admin.'" />
     <section class="cf-card p-4 mb-4 flex flex-wrap gap-3" aria-label="Filters">
       <p-iconfield class="flex-1 min-w-[220px]"><p-inputicon styleClass="pi pi-search" /><input pInputText [(ngModel)]="q" (ngModelChange)="search$.next()" placeholder="Search name, email, student ID" aria-label="Search users" class="w-full" /></p-iconfield>
       <p-select [(ngModel)]="role" [options]="roleOptions" optionLabel="label" optionValue="value" placeholder="Any role" [showClear]="true" (onChange)="reload()" ariaLabel="Role" />
@@ -45,12 +49,16 @@ import { EmptyState, ErrorState } from '../../../shared/components/empty-state';
               <td class="text-sm tabular-nums">{{ u.studentId }}</td>
               <td class="text-sm">{{ u.department }}</td>
               <td class="text-xs cf-muted">{{ u.reportCount }} reports · {{ u.claimCount }} claims<br />@if (u.lastLoginAt) { last seen {{ timeAgo(u.lastLoginAt) }} } @else { joined {{ u.createdAt | date: 'd MMM y' }} }</td>
-              <td><p-tag [value]="u.role === 'admin' ? 'Administrator' : 'Student'" [severity]="u.role === 'admin' ? 'contrast' : 'info'" [rounded]="true" /></td>
+              <td><p-tag [value]="roleTag(u).label" [icon]="roleTag(u).icon" [severity]="roleTag(u).severity" [rounded]="true" /></td>
               <td><p-tag [value]="u.status === 'active' ? 'Active' : 'Inactive'" [severity]="u.status === 'active' ? 'success' : 'secondary'" [rounded]="true" /></td>
               <td class="text-right whitespace-nowrap">
                 @if (u.id !== me()) {
-                  <p-button [icon]="u.role === 'admin' ? 'pi pi-user-minus' : 'pi pi-shield'" [text]="true" [rounded]="true" severity="secondary" [pTooltip]="u.role === 'admin' ? 'Make student' : 'Make administrator'" (onClick)="toggleRole(u)" [ariaLabel]="(u.role === 'admin' ? 'Make student: ' : 'Make administrator: ') + u.fullName" />
+                  @if (auth.isSuperAdmin()) {
+                    <p-button icon="pi pi-id-card" [text]="true" [rounded]="true" severity="secondary" pTooltip="Change role" (onClick)="openRoleMenu($event, u)" [ariaLabel]="'Change role: ' + u.fullName" />
+                  }
+                  @if (auth.isSuperAdmin() || u.role === 'student') {
                   <p-button [icon]="u.status === 'active' ? 'pi pi-ban' : 'pi pi-check-circle'" [text]="true" [rounded]="true" [severity]="u.status === 'active' ? 'danger' : 'success'" [pTooltip]="u.status === 'active' ? 'Deactivate' : 'Reactivate'" (onClick)="toggleStatus(u)" [ariaLabel]="(u.status === 'active' ? 'Deactivate ' : 'Reactivate ') + u.fullName" />
+                  }
                 }
               </td>
             </tr>
@@ -60,12 +68,19 @@ import { EmptyState, ErrorState } from '../../../shared/components/empty-state';
           </td></tr></ng-template>
         </p-table>
       </div>
+      <p-menu #roleMenu [model]="roleItems" [popup]="true" appendTo="body" />
     }
   `,
 })
 export class AdminUsersPage {
   private svc = inject(UsersService);
-  private auth = inject(AuthService);
+  auth = inject(AuthService);
+  readonly roleLabel = ROLE_LABEL;
+  readonly roleIcon = ROLE_ICON;
+  readonly roleSeverity = ROLE_SEVERITY;
+  roleMenu = viewChild<Menu>('roleMenu');
+  roleTag(u: User) { return { label: ROLE_LABEL[u.role], icon: ROLE_ICON[u.role], severity: ROLE_SEVERITY[u.role] }; }
+  roleItems: MenuItem[] = [];
   private notify = inject(NotifyService);
   private confirm = inject(ConfirmationService);
   rows = signal<User[]>([]);
@@ -77,7 +92,7 @@ export class AdminUsersPage {
   q = '';
   role: string | null = null;
   status: string | null = null;
-  roleOptions = [{ label: 'Students', value: 'student' }, { label: 'Administrators', value: 'admin' }];
+  roleOptions = [{ label: 'Students', value: 'student' }, { label: 'Staff', value: 'admin' }, { label: 'Super admins', value: 'super_admin' }];
   statusOptions = [{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }];
   search$ = new Subject<void>();
   initials = initials;
@@ -101,9 +116,17 @@ export class AdminUsersPage {
       accept: () => this.svc.update(u.id, body).subscribe({ next: () => { this.notify.success(done, u.fullName); this.fetch(); }, error: (err) => this.notify.error('Could not update', errorMessage(err)) }),
     });
   }
-  toggleRole(u: User) {
-    const toAdmin = u.role !== 'admin';
-    this.change(u, { role: toAdmin ? 'admin' : 'student' }, toAdmin ? 'Make administrator?' : 'Make student?', toAdmin ? `${u.fullName} will be able to review claims, manage items and users.` : `${u.fullName} will lose administrator access.`, toAdmin ? 'Promoted to administrator' : 'Changed to student');
+  private readonly ROLE_EFFECT: Record<Role, string> = {
+    student: 'will only be able to report items and make claims.',
+    admin: 'will be able to pick up and process claims, manage items and deactivate students.',
+    super_admin: 'will have full control, including staff accounts and roles.',
+  };
+  openRoleMenu(e: Event, u: User) {
+    this.roleItems = (['student', 'admin', 'super_admin'] as Role[]).map((r) => ({
+      label: ROLE_LABEL[r], icon: ROLE_ICON[r], disabled: r === u.role,
+      command: () => this.change(u, { role: r }, `Make ${ROLE_LABEL[r].toLowerCase()}?`, `${u.fullName} ${this.ROLE_EFFECT[r]}`, `Role changed to ${ROLE_LABEL[r].toLowerCase()}`),
+    }));
+    this.roleMenu()?.toggle(e);
   }
   toggleStatus(u: User) {
     const off = u.status === 'active';

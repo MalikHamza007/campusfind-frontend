@@ -27,6 +27,7 @@ export class ClaimsService {
   create(body: unknown) { return this.api.post<{ claim: Claim }>('/claims', body, true).pipe(map((r) => r.claim)); }
   update(id: string, body: unknown) { return this.api.patch<{ claim: Claim }>(`/claims/${id}`, body, true).pipe(map((r) => r.claim)); }
   withdraw(id: string) { return this.api.post<{ claim: Claim }>(`/claims/${id}/withdraw`, {}, true).pipe(map((r) => r.claim)); }
+  assign(id: string, version: number, staffId?: string) { return this.api.post<{ claim: Claim }>(`/claims/${id}/assign`, { version, staffId }, true).pipe(map((r) => r.claim)); }
   approve(id: string, version: number, adminNote?: string) { return this.api.post<{ claim: Claim }>(`/claims/${id}/approve`, { version, adminNote }, true).pipe(map((r) => r.claim)); }
   reject(id: string, version: number, adminNote: string) { return this.api.post<{ claim: Claim }>(`/claims/${id}/reject`, { version, adminNote }, true).pipe(map((r) => r.claim)); }
   markReturned(id: string, version: number, adminNote?: string) { return this.api.post<{ claim: Claim }>(`/claims/${id}/return`, { version, adminNote }, true).pipe(map((r) => r.claim)); }

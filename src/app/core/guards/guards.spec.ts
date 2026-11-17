@@ -42,4 +42,12 @@ describe('route guards', () => {
     expect(run(roleGuard, { permission: 'claims.review' })).toBe(true);
     expect(TestBed.inject(Router).serializeUrl(run(roleGuard, { permission: 'claims.create' }) as UrlTree)).toBe('/forbidden');
   });
+  it('super admin inherits staff routes and alone holds role management', () => {
+    setup('super_admin');
+    expect(run(roleGuard, { roles: ['admin'] })).toBe(true);
+    expect(run(roleGuard, { permission: 'users.roles' })).toBe(true);
+    expect(can('admin', 'users.roles')).toBe(false);
+    expect(can('admin', 'claims.review')).toBe(true);
+    expect(can('student', 'claims.review')).toBe(false);
+  });
 });

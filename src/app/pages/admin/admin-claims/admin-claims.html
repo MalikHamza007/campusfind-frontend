@@ -1,4 +1,4 @@
-<app-page-header title="Claim review" subtitle="Compare the finder's report, the owner's lost report and their evidence. Approve one owner, then confirm the handover when they collect it." />
+<app-page-header title="Claim review" subtitle="Pick up a claim from the queue so the student knows who is handling it. Compare the finder's report, the owner's lost report and their evidence, approve one owner, then confirm the handover when they collect it." />
 
 <section class="cf-card p-4 mb-4 flex flex-wrap gap-3 items-center" aria-label="Filters">
   <p-iconfield class="flex-1 min-w-[240px]">
@@ -6,6 +6,7 @@
     <input pInputText [(ngModel)]="search" (ngModelChange)="typed()" placeholder="Search by item code, title, student name or ID" aria-label="Search claims" class="w-full" />
   </p-iconfield>
   <p-select [(ngModel)]="statusFilter" [options]="statusOptions" optionLabel="label" optionValue="value" placeholder="All statuses" [showClear]="true" (onChange)="reload()" ariaLabel="Status" class="min-w-[200px]" />
+  <p-select [(ngModel)]="assignedFilter" [options]="assignedOptions" optionLabel="label" optionValue="value" placeholder="Everyone's claims" [showClear]="true" (onChange)="reload()" ariaLabel="Handled by" class="min-w-[200px]" />
 </section>
 
 @if (error()) {
@@ -13,22 +14,24 @@
 } @else {
   <div class="cf-card cf-table-wrap">
     <p-table [value]="rows()" [lazy]="true" (onLazyLoad)="onLazy($event)" [paginator]="true" [rows]="limit" [totalRecords]="total()" [rowsPerPageOptions]="[10, 20, 50]" [loading]="loading()" [showLoader]="false" [rowHover]="true" responsiveLayout="stack" [breakpoint]="'900px'">
-      <ng-template #header><tr><th>Found item</th><th>Claimant</th><th>Linked lost report</th><th>Submitted</th><th>Status</th><th class="text-right">Actions</th></tr></ng-template>
+      <ng-template #header><tr><th>Found item</th><th>Claimant</th><th>Linked lost report</th><th>Submitted</th><th>Handled by</th><th>Status</th><th class="text-right">Actions</th></tr></ng-template>
       <ng-template #body let-c>
         <tr class="cursor-pointer" (click)="review(c)">
           <td><div class="flex flex-col gap-1"><span class="font-semibold">{{ c.foundItem?.title }}</span><app-code-tag [code]="c.foundItem?.code ?? ''" /></div></td>
           <td><p class="m-0 text-sm font-medium">{{ c.claimant?.fullName }}</p><p class="m-0 text-xs cf-muted">{{ c.claimant?.studentId }} · {{ c.claimant?.department }}</p></td>
           <td class="text-sm">@if (c.lostItem) { {{ c.lostItem.code }} } @else { <span class="cf-muted">—</span> }</td>
           <td class="text-sm">{{ timeAgo(c.createdAt) }}</td>
+          <td class="text-sm">@if (c.assignedTo) { <span class="font-medium">{{ c.assignedTo.id === me() ? 'You' : c.assignedTo.fullName }}</span> } @else { <span class="cf-muted">Not picked up</span> }</td>
           <td><app-claim-status [status]="c.status" /></td>
           <td class="text-right whitespace-nowrap" (click)="$event.stopPropagation()">
+            @if (c.status === 'pending' && !c.assignedTo) { <p-button icon="pi pi-user-plus" [text]="true" [rounded]="true" pTooltip="Pick up this claim" (onClick)="pickUp(c)" ariaLabel="Pick up claim" /> }
             <p-button icon="pi pi-search-plus" [text]="true" [rounded]="true" pTooltip="Review evidence" (onClick)="review(c)" ariaLabel="Review claim" />
             @if (c.status === 'pending' || c.status === 'rejected') { <p-button icon="pi pi-trash" [text]="true" [rounded]="true" severity="danger" pTooltip="Delete claim" (onClick)="remove(c)" ariaLabel="Delete claim" /> }
           </td>
         </tr>
       </ng-template>
       <ng-template #emptymessage>
-        <tr><td colspan="6">
+        <tr><td colspan="7">
           @if (loading()) { <div class="flex flex-col gap-2">@for (s of [1,2,3,4]; track s) { <p-skeleton height="2.75rem" /> }</div> }
           @else { <app-empty-state [title]="statusFilter === 'pending' ? 'No claims waiting for review' : 'No claims match'" message="New ownership claims show up here as soon as students submit them." /> }
         </td></tr>
@@ -89,6 +92,16 @@
             }
           </div>
         } @else { <p class="text-xs cf-muted m-0">No documents attached.</p> }
+        @if (c.status === 'pending') {
+          <div class="flex flex-col gap-2">
+            <p class="text-xs font-semibold cf-muted m-0">Handled by</p>
+            @if (auth.can('claims.assign')) {
+              <p-select [ngModel]="c.assignedTo?.id ?? null" (ngModelChange)="assignTo(c, $event)" [options]="staffOptions()" optionLabel="label" optionValue="value" placeholder="Not picked up" appendTo="body" ariaLabel="Assign to staff member" class="w-full" />
+            } @else if (c.assignedTo) {
+              <p class="m-0 text-sm">{{ c.assignedTo.id === me() ? 'You' : c.assignedTo.fullName }}@if (c.assignedTo.department) { <span class="cf-muted"> · {{ c.assignedTo.department }}</span> }</p>
+            } @else { <p class="m-0 text-sm cf-muted">Nobody yet</p> }
+          </div>
+        }
         <app-claim-timeline [claim]="c" />
       </section>
     </div>
@@ -110,6 +123,7 @@
         <p-button [label]="decision() === 'approve' ? 'Approve claim' : decision() === 'reject' ? 'Reject claim' : 'Confirm handover'" [severity]="decision() === 'reject' ? 'danger' : 'primary'" icon="pi pi-check" [loading]="acting()" (onClick)="act()" />
       } @else {
         <p-button label="Close" [text]="true" severity="secondary" (onClick)="closeReview()" />
+        @if (c.status === 'pending' && c.assignedTo?.id !== me()) { <p-button label="Pick up" icon="pi pi-user-plus" [outlined]="true" severity="secondary" (onClick)="pickUp(c)" /> }
         @if (c.status === 'pending') {
           <p-button label="Reject" icon="pi pi-times" severity="danger" [outlined]="true" (onClick)="start('reject')" />
           <p-button label="Approve" icon="pi pi-check" (onClick)="start('approve')" />

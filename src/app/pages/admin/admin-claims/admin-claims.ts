@@ -16,7 +16,8 @@ import { Message } from 'primeng/message';
 import { ConfirmationService } from 'primeng/api';
 import { Subject, debounceTime } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ClaimsService, ItemsService } from '../../../core/services/data.services';
+import { ClaimsService, ItemsService, UsersService } from '../../../core/services/data.services';
+import { AuthService } from '../../../core/services/auth.service';
 import { NotifyService } from '../../../core/services/notify.service';
 import { Claim, Item } from '../../../core/interfaces/models';
 import { CLAIM_STATUS_OPTIONS } from '../../../core/constants/labels';
@@ -42,6 +43,12 @@ export class AdminClaimsPage implements OnInit {
   open = input<string>();
   private svc = inject(ClaimsService);
   private items = inject(ItemsService);
+  private users = inject(UsersService);
+  auth = inject(AuthService);
+  me = () => this.auth.user()?.id;
+  assignedFilter: string | null = null;
+  assignedOptions = [{ label: 'Waiting to be picked up', value: 'unassigned' }, { label: 'Handled by me', value: 'me' }];
+  staffOptions = signal<{ label: string; value: string }[]>([]);
   private notify = inject(NotifyService);
   private confirm = inject(ConfirmationService);
 
@@ -75,13 +82,19 @@ export class AdminClaimsPage implements OnInit {
   ngOnInit() {
     if (this.status() !== undefined) this.statusFilter = this.status() || null;
     if (this.q()) { this.search = this.q()!; this.statusFilter = null; }
+    if (this.auth.can('claims.assign')) {
+      this.users.list({ role: 'admin', status: 'active', limit: 100 }).subscribe({
+        next: (r) => this.staffOptions.set([{ label: 'Me', value: this.me()! }, ...r.data.map((u) => ({ label: `${u.fullName} · ${u.department}`, value: u.id }))]),
+        error: () => undefined,
+      });
+    }
     if (this.open()) this.svc.get(this.open()!).subscribe({ next: (c) => this.review(c), error: () => undefined });
   }
 
   fetch() {
     this.loading.set(true);
     this.error.set(null);
-    this.svc.list({ status: this.statusFilter, q: this.search.trim(), page: this.page, limit: this.limit }).subscribe({
+    this.svc.list({ status: this.statusFilter, assigned: this.assignedFilter, q: this.search.trim(), page: this.page, limit: this.limit }).subscribe({
       next: (r) => { this.rows.set(r.data); this.total.set(r.total); this.loading.set(false); },
       error: (err) => { this.error.set(errorMessage(err, 'Claims could not load.')); this.loading.set(false); },
     });
@@ -130,6 +143,19 @@ export class AdminClaimsPage implements OnInit {
         this.actionError.set(code === 'STALE_VERSION' || code === 'INVALID_STATE' || code === 'ALREADY_APPROVED' ? `${errorMessage(err)} The list has been refreshed.` : errorMessage(err));
         if (code) { this.fetch(); this.svc.get(c.id).subscribe({ next: (fresh) => this.selected.set(fresh), error: () => undefined }); }
       },
+    });
+  }
+
+  pickUp(c: Claim) { this.assignTo(c, this.me()!); }
+  assignTo(c: Claim, staffId: string | null) {
+    if (!staffId) return;
+    this.svc.assign(c.id, c.version, staffId === this.me() ? undefined : staffId).subscribe({
+      next: (updated) => {
+        this.notify.success(staffId === this.me() ? 'Claim picked up' : 'Claim assigned', `${updated.foundItem?.code} · handled by ${updated.assignedTo?.fullName}`);
+        if (this.selected()?.id === c.id) this.selected.set(updated);
+        this.fetch();
+      },
+      error: (err) => { this.notify.error('Could not assign', errorMessage(err)); this.fetch(); },
     });
   }
 

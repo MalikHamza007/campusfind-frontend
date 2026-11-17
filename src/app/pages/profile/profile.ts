@@ -8,6 +8,7 @@ import { Select } from 'primeng/select';
 import { Message } from 'primeng/message';
 import { Tag } from 'primeng/tag';
 import { Avatar } from 'primeng/avatar';
+import { ROLE_ICON, ROLE_LABEL, ROLE_SEVERITY } from '../../core/constants/permissions';
 import { FileUpload, FileSelectEvent } from 'primeng/fileupload';
 import { switchMap } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
@@ -26,6 +27,9 @@ import { PASSWORD_RULES, strongPassword } from '../auth/register/register';
   templateUrl: './profile.html',
 })
 export class ProfilePage implements OnInit {
+  readonly roleLabel = ROLE_LABEL;
+  readonly roleIcon = ROLE_ICON;
+  readonly roleSeverity = ROLE_SEVERITY;
   auth = inject(AuthService);
   private users = inject(UsersService);
   private files = inject(FilesService);

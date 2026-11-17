@@ -32,12 +32,13 @@ import { ClaimTimeline } from '../claim-timeline';
     } @else {
       <div class="cf-card cf-table-wrap">
         <p-table [value]="rows()" dataKey="id" [lazy]="true" (onLazyLoad)="onLazy($event)" [paginator]="true" [rows]="limit" [totalRecords]="total()" [loading]="loading()" [showLoader]="false" responsiveLayout="stack" [breakpoint]="'768px'">
-          <ng-template #header><tr><th class="w-12"></th><th>Found item</th><th>Submitted</th><th>Status</th><th class="text-right">Actions</th></tr></ng-template>
+          <ng-template #header><tr><th class="w-12"></th><th>Found item</th><th>Submitted</th><th>Handled by</th><th>Status</th><th class="text-right">Actions</th></tr></ng-template>
           <ng-template #body let-c let-expanded="expanded">
             <tr>
               <td><p-button type="button" [pRowToggler]="c" [text]="true" [rounded]="true" severity="secondary" [icon]="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" [ariaLabel]="expanded ? 'Hide progress' : 'Show progress'" /></td>
               <td><div class="flex flex-col gap-1"><span class="font-semibold">{{ c.foundItem?.title }}</span><span class="flex items-center gap-2"><app-code-tag [code]="c.foundItem?.code ?? ''" />@if (c.lostItem) { <span class="text-xs cf-muted">linked to {{ c.lostItem.code }}</span> }</span></div></td>
               <td class="text-sm">{{ c.createdAt | date: 'd MMM y' }}</td>
+              <td class="text-sm">@if (c.assignedTo) { {{ c.assignedTo.fullName }}<br /><span class="text-xs cf-muted">{{ c.assignedTo.department }}</span> } @else if (c.status === 'pending') { <span class="cf-muted">Waiting for staff</span> } @else { <span class="cf-muted">—</span> }</td>
               <td><app-claim-status [status]="c.status" /></td>
               <td class="text-right whitespace-nowrap">
                 <a pButton [routerLink]="['/items', c.foundItem?.id]" icon="pi pi-eye" [text]="true" [rounded]="true" severity="secondary" pTooltip="View item" [attr.aria-label]="'View ' + c.foundItem?.title"></a>
@@ -46,7 +47,7 @@ import { ClaimTimeline } from '../claim-timeline';
             </tr>
           </ng-template>
           <ng-template #expandedrow let-c>
-            <tr><td colspan="5">
+            <tr><td colspan="6">
               <div class="grid md:grid-cols-[280px_1fr] gap-6 p-2">
                 <app-claim-timeline [claim]="c" />
                 <div>
@@ -60,7 +61,7 @@ import { ClaimTimeline } from '../claim-timeline';
             </td></tr>
           </ng-template>
           <ng-template #emptymessage>
-            <tr><td colspan="5">
+            <tr><td colspan="6">
               @if (loading()) { <div class="flex flex-col gap-2">@for (s of [1,2,3]; track s) { <p-skeleton height="2.75rem" /> }</div> }
               @else { <app-empty-state title="No claims yet" message="If you see your belonging in the directory, open it and choose “This is mine”."><a pButton routerLink="/items" [queryParams]="{ type: 'found' }" label="Browse found items"></a></app-empty-state> }
             </td></tr>

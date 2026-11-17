@@ -21,6 +21,7 @@ export const roleGuard: CanActivateFn = (route) => {
   const roles = route.data['roles'] as Role[] | undefined;
   const permission = route.data['permission'] as Permission | undefined;
   const role = auth.role();
-  const ok = !!role && (!roles || roles.includes(role)) && (!permission || auth.can(permission));
+  // super_admin inherits every admin (staff) route
+  const ok = !!role && (!roles || roles.includes(role) || (role === 'super_admin' && roles.includes('admin'))) && (!permission || auth.can(permission));
   return ok ? true : inject(Router).createUrlTree(['/forbidden']);
 };

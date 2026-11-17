@@ -1,5 +1,5 @@
 /** Typed models — mirror backend/docs/API_CONTRACT.md. */
-export type Role = 'student' | 'admin';
+export type Role = 'student' | 'admin' | 'super_admin';
 export type ReportType = 'lost' | 'found';
 export type Category = 'id_card' | 'electronics' | 'calculator' | 'book' | 'keys' | 'wallet' | 'clothing' | 'other';
 export type ItemStatus = 'open' | 'claim_pending' | 'matched' | 'returned' | 'closed';
@@ -79,6 +79,9 @@ export interface Claim {
   status: ClaimStatus;
   adminNote: string | null;
   reviewedBy: { id: string; fullName?: string } | null;
+  /** Staff member handling the claim — visible to the student. */
+  assignedTo: { id: string; fullName: string; department?: string } | null;
+  assignedAt: string | null;
   reviewedAt: string | null;
   returnedAt: string | null;
   withdrawnAt: string | null;

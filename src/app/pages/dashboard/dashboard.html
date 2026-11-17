@@ -2,12 +2,13 @@
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-copy">
     <div class="flex items-center gap-2 flex-wrap">
-      <span class="role-chip" [class.admin]="auth.isAdmin()"><i [class]="auth.isAdmin() ? 'pi pi-shield' : 'pi pi-graduation-cap'"></i>{{ auth.isAdmin() ? 'Administrator' : 'Student' }}</span>
+      <span class="role-chip" [class.admin]="auth.isAdmin()"><i [class]="auth.roleIcon()"></i>{{ auth.roleLabel() }}@if (auth.user()?.department) { · {{ auth.user()?.department }} }</span>
       <span class="text-white/70 text-sm">{{ greeting() }}</span>
     </div>
     <h1 id="hero-title" class="hero-title">{{ auth.isAdmin() ? 'Campus recovery operations at a glance.' : 'Find what you lost. Help return what you found.' }}</h1>
     <p class="hero-sub">
-      @if (auth.isAdmin()) { Review ownership claims, confirm handovers at the office, and keep an eye on where things go missing. }
+      @if (auth.isSuperAdmin()) { You run CampusFind: manage staff and roles, hand claims to the right person, and keep an eye on the whole recovery pipeline. }
+      @else if (auth.isAdmin()) { Pick up claims from the queue, check ownership evidence, confirm handovers at the office, and keep an eye on where things go missing. }
       @else { {{ auth.user()?.department }} · Report a lost item, log something you found, or browse what’s been handed in across campus. }
     </p>
     <div class="flex flex-wrap gap-2 mt-5">
