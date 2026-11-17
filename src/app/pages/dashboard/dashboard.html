@@ -1,0 +1,259 @@
+<!-- HERO: greeting, role, quick actions + live campus map of open items -->
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-copy">
+    <div class="flex items-center gap-2 flex-wrap">
+      <span class="role-chip" [class.admin]="auth.isAdmin()"><i [class]="auth.isAdmin() ? 'pi pi-shield' : 'pi pi-graduation-cap'"></i>{{ auth.isAdmin() ? 'Administrator' : 'Student' }}</span>
+      <span class="text-white/70 text-sm">{{ greeting() }}</span>
+    </div>
+    <h1 id="hero-title" class="hero-title">{{ auth.isAdmin() ? 'Campus recovery operations at a glance.' : 'Find what you lost. Help return what you found.' }}</h1>
+    <p class="hero-sub">
+      @if (auth.isAdmin()) { Review ownership claims, confirm handovers at the office, and keep an eye on where things go missing. }
+      @else { {{ auth.user()?.department }} · Report a lost item, log something you found, or browse what’s been handed in across campus. }
+    </p>
+    <div class="flex flex-wrap gap-2 mt-5">
+      @if (auth.can('claims.review')) {
+        <a pButton routerLink="/admin/claims" [queryParams]="{ status: 'pending' }" label="Review pending claims" icon="pi pi-check-square" class="hero-btn-primary"></a>
+        <a pButton routerLink="/items/new/found" label="Log handed-in item" icon="pi pi-inbox" [outlined]="true" class="hero-btn"></a>
+      } @else if (auth.can('items.create')) {
+        <a pButton routerLink="/items/new/lost" label="Report lost item" icon="pi pi-exclamation-circle" class="hero-btn-primary"></a>
+        <a pButton routerLink="/items/new/found" label="Report found item" icon="pi pi-inbox" [outlined]="true" class="hero-btn"></a>
+      }
+      <a pButton routerLink="/items" label="Browse directory" icon="pi pi-search" [text]="true" class="hero-btn-text"></a>
+    </div>
+  </div>
+  <div class="hero-map">
+    <app-items-map [pins]="pins()" [zoom]="16" class="h-full" ariaLabel="Open items on the campus map" (pinClick)="openItem($event)" />
+    <div class="map-legend" aria-hidden="true"><span><i class="cf-type-dot cf-type-lost"></i>Lost</span><span><i class="cf-type-dot cf-type-found"></i>Found</span><span class="opacity-75">{{ pins().length }} open</span></div>
+  </div>
+</section>
+
+<!-- FILTERS: one row above everything they affect -->
+<section class="cf-card p-3 md:p-4 mt-6 flex flex-wrap items-end gap-3" aria-label="Dashboard filters">
+  <div class="cf-field min-w-[220px] flex-1 sm:flex-none">
+    <label for="f-range" class="text-xs!">Event date</label>
+    <p-datepicker inputId="f-range" [(ngModel)]="range" selectionMode="range" [readonlyInput]="true" [showIcon]="true" [maxDate]="maxDate" dateFormat="d M yy" placeholder="All dates" [showButtonBar]="true" (onSelect)="range?.[1] && applyFilters()" (onClearClick)="applyFilters()" appendTo="body" />
+  </div>
+  <div class="cf-field min-w-[160px] flex-1 sm:flex-none">
+    <label for="f-cat" class="text-xs!">Category</label>
+    <p-select inputId="f-cat" [(ngModel)]="category" [options]="categoryOptions" optionLabel="label" optionValue="value" placeholder="All categories" [showClear]="true" (onChange)="applyFilters()" appendTo="body" />
+  </div>
+  <div class="cf-field min-w-[160px] flex-1 sm:flex-none">
+    <label for="f-loc" class="text-xs!">Location</label>
+    <p-select inputId="f-loc" [(ngModel)]="location" [options]="locationOptions" optionLabel="label" optionValue="value" placeholder="All locations" [showClear]="true" (onChange)="applyFilters()" appendTo="body" />
+  </div>
+  @if (auth.isAdmin()) {
+    <div class="cf-field min-w-[170px] flex-1 sm:flex-none">
+      <label for="f-dep" class="text-xs!">Reporter department</label>
+      <p-select inputId="f-dep" [(ngModel)]="department" [options]="departmentOptions()" optionLabel="label" optionValue="value" placeholder="All departments" [showClear]="true" (onChange)="applyFilters()" appendTo="body" />
+    </div>
+  } @else {
+    <div class="cf-field min-w-[130px] flex-1 sm:flex-none">
+      <label for="f-type" class="text-xs!">Report type</label>
+      <p-select inputId="f-type" [(ngModel)]="reportType" [options]="typeOptions" optionLabel="label" optionValue="value" placeholder="Both" [showClear]="true" (onChange)="applyFilters()" appendTo="body" />
+    </div>
+  }
+  <div class="flex items-center gap-2 ml-auto">
+    <p-selectbutton [options]="granularityOptions" [ngModel]="granularity()" (ngModelChange)="setGranularity($event)" optionLabel="label" optionValue="value" [allowEmpty]="false" ariaLabelledBy="Time grouping" size="small" />
+    @if (hasFilters()) { <p-button label="Reset" icon="pi pi-filter-slash" [text]="true" size="small" (onClick)="resetFilters()" /> }
+    <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" size="small" (onClick)="applyFilters()" ariaLabel="Refresh dashboard" pTooltip="Refresh" tooltipPosition="top" />
+  </div>
+</section>
+
+@if (error()) {
+  <div class="cf-card mt-6"><app-error-state title="Dashboard data could not load" [message]="error()!"><p-button label="Try again" icon="pi pi-refresh" (onClick)="load()" /></app-error-state></div>
+} @else if (loading() && !admin() && !student()) {
+  <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mt-6">@for (i of [1,2,3,4,5,6]; track i) { <p-skeleton height="112px" borderRadius="18px" /> }</div>
+  <div class="grid lg:grid-cols-2 gap-4 mt-4">@for (i of [1,2]; track i) { <p-skeleton height="320px" borderRadius="18px" /> }</div>
+} @else {
+  @if (admin(); as s) {
+    <!-- ADMIN KPIs -->
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mt-6" [class.opacity-60]="loading()">
+      <app-kpi-card label="Total lost" [value]="s.kpis.totalLost.value" [trend]="s.kpis.totalLost.trend" icon="pi pi-exclamation-circle" color="var(--cf-lost)" [query]="{ type: 'lost' }" hint="new per week, last 8 weeks" />
+      <app-kpi-card label="Total found" [value]="s.kpis.totalFound.value" [trend]="s.kpis.totalFound.trend" icon="pi pi-inbox" color="var(--cf-found)" [query]="{ type: 'found' }" hint="new per week, last 8 weeks" />
+      <app-kpi-card label="Open items" [value]="s.kpis.openItems.value" icon="pi pi-folder-open" color="#3b6fd4" [query]="{ status: 'open' }" />
+      <app-kpi-card label="Pending claims" [value]="s.kpis.pendingClaims.value" icon="pi pi-clock" color="#a8730f" link="/admin/claims" [query]="{ status: 'pending' }" hint="awaiting your review" />
+      <app-kpi-card label="Matched items" [value]="s.kpis.matchedItems.value" icon="pi pi-link" color="#8a4fd0" [query]="{ status: 'matched' }" hint="ready for handover" />
+      <app-kpi-card label="Returned" [value]="s.kpis.returnedItems.value" [trend]="s.kpis.returnedItems.trend" icon="pi pi-check-circle" color="var(--cf-found)" [query]="{ status: 'returned' }" [hint]="s.kpis.recoveryRate.value + '% of found items handed back'" />
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4">
+      <div class="xl:col-span-2">
+        <app-chart-card title="Lost vs found by category" subtitle="Click a bar to open that category in the directory" [table]="catTable()">
+          @if (catChart(); as d) { <p-chart type="bar" [data]="d" [options]="barOptions()" height="280px" ariaLabel="Grouped bar chart of lost and found reports per category" /> }
+        </app-chart-card>
+      </div>
+      <app-chart-card title="Items by status" subtitle="Click a slice to filter" [table]="statusTable()">
+        @if (statusChart(); as d) { <p-chart type="doughnut" [data]="d" [options]="doughnutOptions()" height="280px" ariaLabel="Doughnut chart of items by status" /> }
+      </app-chart-card>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4">
+      <div class="xl:col-span-2">
+        <app-chart-card title="Reports and returns over time" [subtitle]="granularity() === 'week' ? 'Reports by event week · returns by handover week' : 'Reports by event day · returns by handover day'" [table]="trendTable()">
+          @if (trendChart(); as d) { <p-chart type="line" [data]="d" [options]="lineOptions()" height="280px" ariaLabel="Line chart of reports and returns over time" /> }
+        </app-chart-card>
+      </div>
+      <!-- Funnel -->
+      <section class="cf-card cf-card-pad" aria-labelledby="funnel-title">
+        <h2 id="funnel-title" class="cf-section-title">Recovery funnel</h2>
+        <p class="cf-section-sub mb-5">Found reports moving from open to returned</p>
+        <ol class="funnel">
+          @for (step of funnel(); track step.stage) {
+            <li>
+              <div class="flex justify-between text-sm mb-1.5"><span class="font-semibold">{{ step.stage }}</span><span class="tabular-nums"><strong>{{ step.count }}</strong>@if (step.conv !== null) { <span class="cf-muted text-xs"> · {{ step.conv }}% of previous</span> }</span></div>
+              <div class="funnel-track"><div class="funnel-bar" [style.width.%]="step.pct" [style.opacity]="1 - $index * 0.16"></div></div>
+            </li>
+          }
+        </ol>
+      </section>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4">
+      <app-chart-card title="Reports by location" subtitle="Where things go missing and turn up" [table]="locationTable()">
+        @if (locationChart(); as d) { <p-chart type="bar" [data]="d" [options]="hbarOptions()" height="280px" ariaLabel="Horizontal bar chart of reports per campus location" /> }
+      </app-chart-card>
+      <!-- Pending queue -->
+      <section class="cf-card cf-card-pad xl:col-span-2" aria-labelledby="queue-title">
+        <div class="flex items-center justify-between mb-4">
+          <div><h2 id="queue-title" class="cf-section-title">Pending claim queue</h2><p class="cf-section-sub">Oldest first — compare evidence before approving</p></div>
+          <a pButton routerLink="/admin/claims" [queryParams]="{ status: 'pending' }" label="Open review" icon="pi pi-arrow-right" iconPos="right" [text]="true" size="small"></a>
+        </div>
+        @if (s.tables.pendingQueue.length) {
+          <ul class="list-none m-0 p-0 divide-y" style="--tw-divide-opacity:1; border-color: var(--cf-border)">
+            @for (c of s.tables.pendingQueue; track c.id) {
+              <li class="py-3 flex items-center gap-3 flex-wrap">
+                <app-code-tag [code]="c.foundItem?.code ?? ''" />
+                <div class="min-w-0 flex-1">
+                  <p class="m-0 text-sm font-semibold truncate">{{ c.foundItem?.title }}</p>
+                  <p class="m-0 text-xs cf-muted truncate">Claimed by {{ c.claimant?.fullName }} · {{ c.claimant?.department }} · {{ timeAgo(c.createdAt) }}@if (c.lostItem) { · linked lost report {{ c.lostItem.code }} }</p>
+                </div>
+                <a pButton [routerLink]="['/admin/claims']" [queryParams]="{ open: c.id }" label="Review" size="small" [outlined]="true"></a>
+              </li>
+            }
+          </ul>
+        } @else { <app-empty-state title="No claims waiting" message="New ownership claims will appear here." /> }
+      </section>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4">
+      <section class="cf-card cf-card-pad" aria-labelledby="newest-title">
+        <h2 id="newest-title" class="cf-section-title mb-4">Newest reports</h2>
+        <ul class="list-none m-0 p-0 flex flex-col gap-3">
+          @for (i of s.tables.newestReports; track i.id) {
+            <li><a [routerLink]="['/items', i.id]" class="flex items-center gap-3 no-underline rounded-xl p-1 -m-1 hover:bg-[var(--cf-surface-2)]">
+              <span class="cf-thumb">@if (i.images[0]; as img) { <app-secure-image [fileId]="img.id" [url]="img.url" [alt]="i.title" /> } @else { <i class="pi pi-image"></i> }</span>
+              <span class="min-w-0 flex-1"><span class="block text-sm font-semibold truncate">{{ i.title }}</span><span class="block text-xs cf-muted truncate">{{ i.locationName }} · {{ timeAgo(i.createdAt) }}</span></span>
+              <app-type-pill [type]="i.reportType" />
+            </a></li>
+          }
+        </ul>
+      </section>
+      <section class="cf-card cf-card-pad" aria-labelledby="returned-title">
+        <h2 id="returned-title" class="cf-section-title mb-4">Recently returned</h2>
+        @if (s.tables.recentlyReturned.length) {
+          <ul class="list-none m-0 p-0 flex flex-col gap-3">
+            @for (i of s.tables.recentlyReturned; track i.id) {
+              <li class="flex items-center gap-3"><span class="w-8 h-8 rounded-full grid place-items-center shrink-0" style="background: color-mix(in srgb, var(--cf-found) 15%, transparent); color: var(--cf-found)"><i class="pi pi-check text-xs"></i></span>
+                <a [routerLink]="['/items', i.id]" class="min-w-0 flex-1 no-underline"><span class="block text-sm font-semibold truncate">{{ i.title }}</span><span class="block text-xs cf-muted">{{ i.code }} · returned {{ i.returnedAt | date: 'd MMM' }}</span></a></li>
+            }
+          </ul>
+        } @else { <app-empty-state title="No handovers yet" /> }
+      </section>
+      <section class="cf-card cf-card-pad" aria-labelledby="audit-title">
+        <div class="flex items-center justify-between mb-4"><h2 id="audit-title" class="cf-section-title">Audit activity</h2><a pButton routerLink="/admin/audit" label="All" [text]="true" size="small"></a></div>
+        <ul class="feed">
+          @for (a of s.tables.activity; track a.id) {
+            <li><i [class]="activityIcon(a.action)"></i><div class="min-w-0"><p class="m-0 text-sm"><strong>{{ a.actor?.fullName ?? 'System' }}</strong> {{ actionLabel(a.action) }} @if (a.metadata?.['code']) { <span class="cf-muted">{{ a.metadata?.['code'] }}</span> }</p><p class="m-0 text-xs cf-muted">{{ timeAgo(a.createdAt) }}</p></div></li>
+          }
+        </ul>
+      </section>
+    </div>
+
+    <!-- System health -->
+    <section class="cf-card cf-card-pad mt-4" aria-labelledby="health-title">
+      <h2 id="health-title" class="cf-section-title mb-4">System health</h2>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+        <div class="health"><span class="dot" [class.ok]="s.health.db === 'up'"></span><div><p class="m-0 font-semibold">Database</p><p class="m-0 cf-muted text-xs">MongoDB {{ s.health.db === 'up' ? 'connected' : s.health.db }}</p></div></div>
+        <div class="health"><span class="dot ok"></span><div><p class="m-0 font-semibold">Private storage</p><p class="m-0 cf-muted text-xs">{{ s.health.storage.files }} files · {{ formatBytes(s.health.storage.bytes) }} · {{ s.health.storage.driver }} bucket</p></div></div>
+        <div class="health"><span class="dot" [class.ok]="!s.health.externalApi.lastError" [class.warn]="!!s.health.externalApi.lastError"></span><div><p class="m-0 font-semibold">Map service</p><p class="m-0 cf-muted text-xs">{{ s.health.externalApi.name }} · {{ s.health.externalApi.live }} live / {{ s.health.externalApi.cache }} cached @if (s.health.externalApi.lastError) { · last issue: {{ s.health.externalApi.lastError }} }</p></div></div>
+        <div class="health"><span class="dot ok"></span><div><p class="m-0 font-semibold">Accounts</p><p class="m-0 cf-muted text-xs">{{ s.health.users.active }} active of {{ s.health.users.total }} · API up {{ (s.health.uptimeSeconds / 3600).toFixed(1) }} h</p></div></div>
+      </div>
+    </section>
+  }
+
+  @if (student(); as s) {
+    <!-- STUDENT KPIs -->
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mt-6" [class.opacity-60]="loading()">
+      <app-kpi-card label="My lost reports" [value]="s.kpis.myLostReports.value" icon="pi pi-exclamation-circle" color="var(--cf-lost)" link="/my-reports" [query]="{ type: 'lost' }" />
+      <app-kpi-card label="My found reports" [value]="s.kpis.myFoundReports.value" icon="pi pi-inbox" color="var(--cf-found)" link="/my-reports" [query]="{ type: 'found' }" />
+      <app-kpi-card label="My pending claims" [value]="s.kpis.myPendingClaims.value" icon="pi pi-clock" color="#a8730f" link="/claims" [query]="{ status: 'pending' }" />
+      <app-kpi-card label="My returned items" [value]="s.kpis.myReturnedItems.value" icon="pi pi-check-circle" color="#3b6fd4" link="/claims" [query]="{ status: 'returned' }" />
+      <app-kpi-card label="Open on campus" [value]="s.kpis.campusOpenItems.value" [trend]="s.kpis.campusOpenItems.trend" icon="pi pi-map-marker" color="#8a4fd0" [query]="{ status: 'open' }" hint="found reports per week" />
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4">
+      <app-chart-card title="My reports by type" subtitle="Click a slice to see those reports">
+        @if (myTypeTotal()) { @if (myTypeChart(); as d) { <p-chart type="doughnut" [data]="d" [options]="doughnutOptions()" height="260px" ariaLabel="Doughnut chart of my lost and found reports" /> } }
+        @else { <app-empty-state title="No reports yet" message="Your lost and found reports will show up here."><a pButton routerLink="/items/new/lost" label="Report lost item" size="small"></a></app-empty-state> }
+      </app-chart-card>
+      <div class="xl:col-span-2">
+        <app-chart-card title="Open items on campus by category" subtitle="Click a bar to browse that category" [table]="openCatTable()">
+          @if (openCatChart(); as d) { <p-chart type="bar" [data]="d" [options]="barOptions()" height="260px" ariaLabel="Bar chart of open items by category" /> }
+        </app-chart-card>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
+      <app-chart-card title="My reports over time" [subtitle]="granularity() === 'week' ? 'Grouped by week of the event' : 'Grouped by day of the event'" [table]="myTimelineTable()">
+        @if (myTimelineChart(); as d) { <p-chart type="line" [data]="d" [options]="lineOptions()" height="260px" ariaLabel="Line chart of my reports over time" /> }
+      </app-chart-card>
+      <app-chart-card title="Campus items by location" subtitle="Click a bar to search that place" [table]="locationTable()">
+        @if (locationChart(); as d) { <p-chart type="bar" [data]="d" [options]="hbarOptions()" height="260px" ariaLabel="Horizontal bar chart of items by location" /> }
+      </app-chart-card>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
+      <section class="cf-card cf-card-pad" aria-labelledby="myrep-title">
+        <div class="flex items-center justify-between mb-4"><h2 id="myrep-title" class="cf-section-title">My recent reports</h2><a pButton routerLink="/my-reports" label="All" [text]="true" size="small"></a></div>
+        @if (s.tables.myRecentReports.length) {
+          <ul class="list-none m-0 p-0 flex flex-col gap-3">
+            @for (i of s.tables.myRecentReports; track i.id) {
+              <li><a [routerLink]="['/items', i.id]" class="flex items-center gap-3 no-underline">
+                <span class="cf-thumb">@if (i.images[0]; as img) { <app-secure-image [fileId]="img.id" [url]="img.url" [alt]="i.title" /> } @else { <i class="pi pi-image"></i> }</span>
+                <span class="min-w-0 flex-1"><span class="block text-sm font-semibold truncate">{{ i.title }}</span><span class="block text-xs cf-muted">{{ i.code }} · {{ i.locationName }}</span></span>
+                <app-item-status [status]="i.status" />
+              </a></li>
+            }
+          </ul>
+        } @else { <app-empty-state title="Nothing reported yet" message="Lost something? Report it so the office can match it."><a pButton routerLink="/items/new/lost" label="Report lost item" size="small"></a></app-empty-state> }
+      </section>
+      <section class="cf-card cf-card-pad" aria-labelledby="myclaims-title">
+        <div class="flex items-center justify-between mb-4"><h2 id="myclaims-title" class="cf-section-title">My claims</h2><a pButton routerLink="/claims" label="All" [text]="true" size="small"></a></div>
+        @if (s.tables.myClaims.length) {
+          <ul class="list-none m-0 p-0 flex flex-col gap-3">
+            @for (c of s.tables.myClaims; track c.id) {
+              <li class="flex items-center gap-3"><app-code-tag [code]="c.foundItem?.code ?? ''" /><span class="min-w-0 flex-1"><span class="block text-sm font-semibold truncate">{{ c.foundItem?.title }}</span><span class="block text-xs cf-muted">Submitted {{ timeAgo(c.createdAt) }}</span></span><app-claim-status [status]="c.status" /></li>
+            }
+          </ul>
+        } @else { <app-empty-state title="No claims yet" message="Spot your item in the directory? Open it and submit a claim." /> }
+      </section>
+      <section class="cf-card cf-card-pad" aria-labelledby="camp-title">
+        <div class="flex items-center justify-between mb-4"><h2 id="camp-title" class="cf-section-title">Recently reported on campus</h2><a pButton routerLink="/items" label="Directory" [text]="true" size="small"></a></div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          @for (i of s.tables.campusRecent; track i.id) {
+            <a [routerLink]="['/items', i.id]" class="campus-card no-underline">
+              <div class="aspect-[4/3] rounded-lg overflow-hidden" style="background: var(--cf-surface-2)">@if (i.images[0]; as img) { <app-secure-image [fileId]="img.id" [url]="img.url" [alt]="i.title" /> } @else { <div class="w-full h-full grid place-items-center cf-muted"><i class="pi pi-image"></i></div> }</div>
+              <p class="m-0 mt-2 text-sm font-semibold truncate">{{ i.title }}</p>
+              <p class="m-0 text-xs cf-muted truncate"><span class="cf-type-dot mr-1" [class]="'cf-type-' + i.reportType"></span>{{ i.locationName }}</p>
+            </a>
+          }
+        </div>
+      </section>
+      <section class="cf-card cf-card-pad" aria-labelledby="act-title">
+        <h2 id="act-title" class="cf-section-title mb-4">My activity</h2>
+        @if (s.tables.activity.length) {
+          <ul class="feed">@for (a of s.tables.activity; track a.id) { <li><i [class]="activityIcon(a.action)"></i><div><p class="m-0 text-sm">You {{ actionLabel(a.action) }} @if (a.metadata?.['code']) { <span class="cf-muted">{{ a.metadata?.['code'] }}</span> }</p><p class="m-0 text-xs cf-muted">{{ timeAgo(a.createdAt) }}</p></div></li> }</ul>
+        } @else { <app-empty-state title="No activity yet" /> }
+      </section>
+    </div>
+  }
+}

@@ -1,0 +1,26 @@
+.hero { display: grid; grid-template-columns: 1fr; gap: 20px; padding: 24px; border-radius: 22px; color: #fff; overflow: hidden;
+  background: radial-gradient(110% 120% at 0% 0%, #1b6b60 0%, #0f3d38 52%, #082824 100%); box-shadow: var(--cf-shadow); }
+@media (min-width: 1024px) { .hero { grid-template-columns: 1.15fr 1fr; padding: 32px; gap: 28px; } }
+.hero-title { font-size: clamp(1.6rem, 3.2vw, 2.4rem); line-height: 1.1; font-weight: 800; margin: 14px 0 0; max-width: 18ch; }
+.hero-sub { color: rgb(255 255 255 / .72); margin: 12px 0 0; max-width: 52ch; line-height: 1.55; font-size: .9375rem; }
+.role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; background: var(--cf-tag); color: var(--cf-tag-ink); }
+.role-chip.admin { background: #fff; color: var(--cf-ink); }
+.hero-map { position: relative; min-height: 240px; border-radius: 16px; overflow: hidden; border: 1px solid rgb(255 255 255 / .15); }
+.hero-map app-items-map { position: absolute; inset: 0; }
+.map-legend { position: absolute; left: 10px; bottom: 10px; z-index: 500; display: flex; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 10px; font-size: .75rem; font-weight: 600; background: rgb(255 255 255 / .92); color: #16232a; }
+.map-legend span { display: inline-flex; align-items: center; gap: 5px; }
+:host ::ng-deep .hero-btn-primary { background: var(--cf-tag) !important; border-color: var(--cf-tag) !important; color: var(--cf-tag-ink) !important; font-weight: 700; }
+:host ::ng-deep .hero-btn { color: #fff !important; border-color: rgb(255 255 255 / .5) !important; }
+:host ::ng-deep .hero-btn-text { color: rgb(255 255 255 / .85) !important; }
+.funnel { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.funnel-track { height: 14px; border-radius: 4px; background: var(--cf-surface-2); overflow: hidden; }
+.funnel-bar { height: 100%; border-radius: 4px; background: var(--cf-found); transition: width .5s ease; }
+.feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.feed li { display: flex; gap: 12px; align-items: flex-start; }
+.feed li > i { width: 28px; height: 28px; flex: none; border-radius: 8px; display: grid; place-items: center; font-size: .8rem; background: var(--cf-surface-2); color: var(--p-primary-600); }
+.health { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; background: var(--cf-surface-2); }
+.dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--p-red-500); }
+.dot.ok { background: var(--cf-found); }
+.dot.warn { background: #a8730f; }
+.campus-card { display: block; border-radius: 12px; padding: 6px; }
+.campus-card:hover { background: var(--cf-surface-2); }
