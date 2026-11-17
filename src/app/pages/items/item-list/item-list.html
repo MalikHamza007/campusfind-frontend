@@ -1,0 +1,81 @@
+<app-page-header title="Lost & found directory" subtitle="Everything reported on campus. Search by name, code or place, then open an item to see photos and the exact spot on the map.">
+  @if (auth.can('items.create')) {
+    <a pButton routerLink="/items/new/lost" label="Report lost" icon="pi pi-exclamation-circle" [outlined]="true"></a>
+    <a pButton routerLink="/items/new/found" label="Report found" icon="pi pi-inbox"></a>
+  }
+</app-page-header>
+
+<section class="cf-card p-4 mb-4 flex flex-col gap-3" aria-label="Search and filters">
+  <div class="flex flex-wrap gap-3 items-center">
+    <p-iconfield class="flex-1 min-w-[220px]">
+      <p-inputicon styleClass="pi pi-search" />
+      <input pInputText [(ngModel)]="filters.q" (ngModelChange)="typed()" placeholder="Search title, description, brand, place or code (CF-F-2015)" aria-label="Search items" class="w-full" />
+    </p-iconfield>
+    <p-selectbutton [options]="typeOptions" [(ngModel)]="filters.type" (onChange)="reload()" optionLabel="label" optionValue="value" [allowEmpty]="false" ariaLabelledBy="Report type" />
+    <p-selectbutton [options]="viewOptions" [ngModel]="view()" (ngModelChange)="setView($event)" optionValue="value" [allowEmpty]="false" ariaLabelledBy="View">
+      <ng-template #item let-o><i [class]="o.icon" [attr.aria-label]="o.label"></i></ng-template>
+    </p-selectbutton>
+  </div>
+  <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+    <p-select [(ngModel)]="filters.category" [options]="categoryOptions" optionLabel="label" optionValue="value" placeholder="Category" [showClear]="true" (onChange)="reload()" ariaLabel="Category" />
+    <p-select [(ngModel)]="filters.status" [options]="statusOptions" optionLabel="label" optionValue="value" placeholder="Status" [showClear]="true" (onChange)="reload()" ariaLabel="Status" />
+    <p-select [(ngModel)]="filters.location" [options]="locationOptions" optionLabel="label" optionValue="value" placeholder="Location" [showClear]="true" [editable]="false" (onChange)="reload()" ariaLabel="Location" />
+    <p-datepicker [(ngModel)]="filters.range" selectionMode="range" [readonlyInput]="true" placeholder="Event date range" [showIcon]="true" [maxDate]="maxDate" dateFormat="d M yy" [showButtonBar]="true" (onSelect)="filters.range?.[1] && reload()" (onClearClick)="reload()" appendTo="body" ariaLabel="Event date range" />
+    <div class="flex gap-2 col-span-2 lg:col-span-1 min-w-0">
+      <p-select [(ngModel)]="filters.sort" [options]="sortOptions" optionLabel="label" optionValue="value" (onChange)="reload()" class="flex-1 min-w-0" ariaLabel="Sort by" />
+      @if (hasFilters()) { <p-button icon="pi pi-filter-slash" [text]="true" (onClick)="clear()" ariaLabel="Clear filters" pTooltip="Clear filters" /> }
+    </div>
+  </div>
+</section>
+
+@if (error()) {
+  <div class="cf-card"><app-error-state title="The directory could not load" [message]="error()!"><p-button label="Try again" icon="pi pi-refresh" (onClick)="fetch()" /></app-error-state></div>
+} @else if (view() === 'map') {
+  <section class="cf-card p-2 h-[560px]" aria-label="Map of matching items">
+    <app-items-map [pins]="pins()" class="h-full" (pinClick)="open($event)" />
+  </section>
+  <p class="cf-muted text-xs mt-2">Showing up to 100 matching items. Raspberry pins are lost reports, teal pins are found items. Click a pin to open it.</p>
+} @else {
+  <div class="cf-card cf-table-wrap">
+    <p-table [value]="rows()" [lazy]="true" (onLazyLoad)="onLazy($event)" [paginator]="true" [rows]="limit" [first]="first" [totalRecords]="total()" [rowsPerPageOptions]="[10, 20, 50]"
+      [loading]="loading()" [showLoader]="false" dataKey="id" [rowHover]="true" responsiveLayout="stack" [breakpoint]="'768px'" currentPageReportTemplate="{first}–{last} of {totalRecords}" [showCurrentPageReport]="true">
+      <ng-template #header>
+        <tr><th>Item</th><th>Type</th><th class="hidden lg:table-cell">Category</th><th>Where & when</th><th>Status</th><th class="text-right">Actions</th></tr>
+      </ng-template>
+      <ng-template #body let-i>
+        @if (loading()) {
+          <tr><td colspan="6"><p-skeleton height="2.75rem" /></td></tr>
+        } @else {
+          <tr class="cursor-pointer" (click)="open(i.id)">
+            <td>
+              <div class="flex items-center gap-3 min-w-0">
+                <span class="cf-thumb">@if (i.images[0]; as img) { <app-secure-image [fileId]="img.id" [url]="img.url" [alt]="i.title" /> } @else { <i class="pi pi-image"></i> }</span>
+                <div class="min-w-0"><p class="m-0 font-semibold truncate max-w-[260px]">{{ i.title }}</p><app-code-tag [code]="i.code" /></div>
+              </div>
+            </td>
+            <td><app-type-pill [type]="i.reportType" /></td>
+            <td class="hidden lg:table-cell"><app-category [category]="i.category" /></td>
+            <td><p class="m-0 text-sm">{{ i.locationName }}</p><p class="m-0 text-xs cf-muted">{{ i.eventDate | date: 'd MMM y' }}</p></td>
+            <td><app-item-status [status]="i.status" /></td>
+            <td class="text-right whitespace-nowrap" (click)="$event.stopPropagation()">
+              <a pButton [routerLink]="['/items', i.id]" icon="pi pi-eye" [text]="true" [rounded]="true" severity="secondary" pTooltip="View details" tooltipPosition="top" [attr.aria-label]="'View ' + i.title"></a>
+              @if (canClaim(i)) { <a pButton [routerLink]="['/claims/new', i.id]" icon="pi pi-verified" [text]="true" [rounded]="true" pTooltip="This is mine — claim it" tooltipPosition="top" [attr.aria-label]="'Claim ' + i.title"></a> }
+              @if (canEdit(i)) { <a pButton [routerLink]="['/items', i.id, 'edit']" icon="pi pi-pencil" [text]="true" [rounded]="true" severity="secondary" pTooltip="Edit report" tooltipPosition="top" [attr.aria-label]="'Edit ' + i.title"></a> }
+            </td>
+          </tr>
+        }
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr><td colspan="6">
+          @if (loading()) { <div class="flex flex-col gap-2 py-2">@for (s of [1,2,3,4,5]; track s) { <p-skeleton height="2.75rem" /> }</div> }
+          @else {
+            <app-empty-state title="No items match" [message]="hasFilters() ? 'Try a broader search or clear the filters.' : 'Nothing has been reported yet.'">
+              @if (hasFilters()) { <p-button label="Clear filters" icon="pi pi-filter-slash" [outlined]="true" (onClick)="clear()" /> }
+              @if (auth.can('items.create')) { <a pButton routerLink="/items/new/lost" label="Report lost item" icon="pi pi-plus"></a> }
+            </app-empty-state>
+          }
+        </td></tr>
+      </ng-template>
+    </p-table>
+  </div>
+}

@@ -1,0 +1,77 @@
+<app-page-header [title]="editing() ? 'Edit report' : reportType() === 'lost' ? 'Report a lost item' : 'Report a found item'"
+  [subtitle]="reportType() === 'lost' ? 'Describe what you lost and where. The office compares it against everything handed in.' : 'Thanks for helping. Describe what you found — your contact details are never shown to other students.'">
+  <a pButton [routerLink]="editing() ? ['/items', id()] : ['/items']" label="Cancel" icon="pi pi-times" [text]="true" severity="secondary"></a>
+</app-page-header>
+
+@if (loadError()) {
+  <div class="cf-card"><app-error-state title="This report could not load" [message]="loadError()!"><p-button label="Try again" icon="pi pi-refresh" (onClick)="load()" /></app-error-state></div>
+} @else if (loading()) {
+  <div class="grid lg:grid-cols-[1.2fr_1fr] gap-4"><p-skeleton height="520px" borderRadius="18px" /><p-skeleton height="520px" borderRadius="18px" /></div>
+} @else {
+  @if (report(); as i) { <div class="mb-4 flex items-center gap-2"><app-code-tag [code]="i.code" /><span class="cf-muted text-sm">Report type can't be changed after creation.</span></div> }
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4 items-start">
+    <section class="cf-card cf-card-pad flex flex-col gap-5" aria-labelledby="details-h">
+      <h2 id="details-h" class="cf-section-title">What is it?</h2>
+      <div class="cf-field">
+        <label for="title">Title</label>
+        <input pInputText id="title" formControlName="title" [placeholder]="reportType() === 'lost' ? 'e.g. Casio FX-991ES calculator' : 'e.g. Grey scientific calculator'" [invalid]="show('title')" />
+        @if (form.controls.title.errors?.['server']) { <span class="cf-error">{{ form.controls.title.errors?.['server'] }}</span> } @else if (show('title')) { <span class="cf-error">Title must be 3–120 characters.</span> }
+      </div>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div class="cf-field">
+          <label for="category">Category</label>
+          <p-select inputId="category" formControlName="category" [options]="categories" optionLabel="label" optionValue="value" placeholder="Choose a category" [fluid]="true" [invalid]="show('category')">
+            <ng-template #item let-o><span class="flex items-center gap-2"><i [class]="o.icon" class="text-xs"></i>{{ o.label }}</span></ng-template>
+          </p-select>
+          @if (show('category')) { <span class="cf-error">Choose a category.</span> }
+        </div>
+        <div class="cf-field">
+          <label for="eventDate">{{ reportType() === 'lost' ? 'Date lost' : 'Date found' }}</label>
+          <p-datepicker inputId="eventDate" formControlName="eventDate" [maxDate]="maxDate" [minDate]="minDate" [showIcon]="true" dateFormat="d M yy" [fluid]="true" [invalid]="show('eventDate')" appendTo="body" />
+          @if (form.controls.eventDate.errors?.['future']) { <span class="cf-error">The date can't be in the future.</span> }
+          @else if (form.controls.eventDate.errors?.['tooOld']) { <span class="cf-error">Reports older than one year aren't accepted.</span> }
+          @else if (show('eventDate')) { <span class="cf-error">Pick a date.</span> }
+        </div>
+      </div>
+      <div class="cf-field">
+        <label for="description">Description</label>
+        <textarea pTextarea id="description" formControlName="description" rows="5" [autoResize]="true" placeholder="Where exactly, what it looks like, what was with it…" [invalid]="show('description')"></textarea>
+        <span class="flex justify-between">
+          @if (form.controls.description.errors?.['server']) { <span class="cf-error">{{ form.controls.description.errors?.['server'] }}</span> } @else if (show('description')) { <span class="cf-error">Describe it in at least 20 characters.</span> } @else { <span class="cf-hint">@if (form.value.category === 'id_card') { ID numbers are masked for other students automatically. } @else { At least 20 characters. } </span> }
+          <span class="cf-hint tabular-nums">{{ form.value.description?.length ?? 0 }}/2000</span>
+        </span>
+      </div>
+      <fieldset class="border-0 p-0 m-0 flex flex-col gap-3">
+        <legend class="text-sm font-semibold mb-2">Distinguishing details @if (reportType() === 'found') { <span class="cf-muted font-normal">— at least one is required</span> } @else { <span class="cf-muted font-normal">(optional)</span> }</legend>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div class="cf-field"><label for="color">Color</label><input pInputText id="color" formControlName="color" placeholder="e.g. Grey" [invalid]="missingDetail() && form.touched" /></div>
+          <div class="cf-field"><label for="brand">Brand</label><input pInputText id="brand" formControlName="brand" placeholder="e.g. Casio" [invalid]="missingDetail() && form.touched" /></div>
+        </div>
+        <div class="cf-field"><label for="features">Distinctive features</label><input pInputText id="features" formControlName="distinctiveFeatures" placeholder="Stickers, scratches, initials, keychain…" [invalid]="missingDetail() && form.touched" /></div>
+        @if (missingDetail() && form.touched) { <span class="cf-error">Add a color, brand or distinctive feature so the owner can be verified.</span> }
+      </fieldset>
+      <div class="cf-field">
+        <span class="text-[0.8125rem] font-semibold">Photos</span>
+        <app-file-attacher purpose="item_image" [(files)]="images" [max]="5" [maxBytes]="5242880" (busyChange)="uploading.set($event)" />
+      </div>
+    </section>
+
+    <section class="cf-card cf-card-pad flex flex-col gap-4 lg:sticky lg:top-20" aria-labelledby="where-h">
+      <div><h2 id="where-h" class="cf-section-title">Where on campus?</h2><p class="cf-section-sub">Search, pick a landmark, or click the map. Map data © OpenStreetMap.</p></div>
+      <app-map-picker [initial]="location()" (changed)="onLocation($event)" />
+      <div class="cf-field">
+        <label for="locationName">Location name</label>
+        <input pInputText id="locationName" formControlName="locationName" placeholder="e.g. IT Lab 03, second row" [invalid]="show('locationName')" />
+        @if (form.controls.locationName.errors?.['server']) { <span class="cf-error">{{ form.controls.locationName.errors?.['server'] }}</span> }
+        @else if (show('locationName')) { <span class="cf-error">Name the place.</span> }
+        @if (form.controls.lat.touched && form.controls.lat.invalid) { <span class="cf-error">Pick the spot on the map.</span> }
+        @if (form.controls.lat.errors?.['server'] || form.controls.lng.errors?.['server']) { <span class="cf-error">Location must be inside the campus boundary.</span> }
+      </div>
+      @if (formError()) { <p-message severity="error" [text]="formError()!" role="alert" /> }
+      <div class="flex gap-2 justify-end">
+        <a pButton [routerLink]="editing() ? ['/items', id()] : ['/items']" label="Cancel" [outlined]="true" severity="secondary"></a>
+        <p-button type="submit" [label]="editing() ? 'Save changes' : reportType() === 'lost' ? 'Submit lost report' : 'Submit found report'" icon="pi pi-check" [loading]="saving()" [disabled]="uploading()" />
+      </div>
+    </section>
+  </form>
+}

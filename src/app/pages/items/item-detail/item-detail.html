@@ -1,0 +1,74 @@
+@if (error()) {
+  <div class="cf-card"><app-error-state title="Report unavailable" [message]="error()!"><a pButton routerLink="/items" label="Back to directory" icon="pi pi-arrow-left"></a></app-error-state></div>
+} @else if (loading()) {
+  <p-skeleton height="2.5rem" width="50%" styleClass="mb-4" />
+  <div class="grid lg:grid-cols-[1.3fr_1fr] gap-4"><p-skeleton height="460px" borderRadius="18px" /><p-skeleton height="460px" borderRadius="18px" /></div>
+} @else if (item(); as i) {
+  <a routerLink="/items" class="text-sm cf-muted no-underline inline-flex items-center gap-1 mb-3 hover:underline"><i class="pi pi-arrow-left text-xs"></i>Directory</a>
+  <header class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-6">
+    <div class="min-w-0">
+      <div class="flex items-center gap-2 flex-wrap mb-2"><app-code-tag [code]="i.code" /><app-type-pill [type]="i.reportType" /><app-item-status [status]="i.status" /></div>
+      <h1 class="text-2xl md:text-3xl font-extrabold m-0">{{ i.title }}</h1>
+      <p class="cf-muted m-0 mt-1 text-sm">Reported {{ timeAgo(i.createdAt) }} by {{ i.isMine ? 'you' : i.reporter.fullName }}@if (i.reporter.department) { · {{ i.reporter.department }} }</p>
+    </div>
+    <div class="flex gap-2 flex-wrap shrink-0">
+      @if (canClaim()) { <a pButton [routerLink]="['/claims/new', i.id]" label="This is mine — claim it" icon="pi pi-verified"></a> }
+      @if (canEdit()) { <a pButton [routerLink]="['/items', i.id, 'edit']" label="Edit" icon="pi pi-pencil" [outlined]="true"></a> }
+      @if (canDelete()) { <p-button label="Delete" icon="pi pi-trash" severity="danger" [outlined]="true" (onClick)="remove()" /> }
+    </div>
+  </header>
+
+  @if (i.deletedAt) { <p-message severity="warn" styleClass="mb-4" text="This report was deleted and is only visible to administrators." /> }
+  @if (myClaim(); as c) { <p-message severity="info" styleClass="mb-4"><span>You claimed this item {{ timeAgo(c.createdAt) }} — status: <strong>{{ c.status }}</strong>. <a routerLink="/claims" class="font-semibold">Track it in My claims</a>.</span></p-message> }
+  @if (i.status === 'matched' && !auth.isAdmin()) { <p-message severity="success" styleClass="mb-4" text="Matched with its owner. Handover happens at the Lost & Found Office in the Admin Block." /> }
+
+  <div class="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-4 items-start">
+    <section class="cf-card p-3" aria-label="Photos">
+      @if (i.images.length) {
+        <div class="aspect-[4/3] rounded-xl overflow-hidden cursor-zoom-in" style="background: var(--cf-surface-2)" (click)="preview.set({ id: i.images[active()].id, originalName: i.title, mimeType: 'image/jpeg' })" role="button" tabindex="0" (keydown.enter)="preview.set({ id: i.images[active()].id, originalName: i.title, mimeType: 'image/jpeg' })" [attr.aria-label]="'Open photo ' + (active() + 1) + ' full size'">
+          @for (img of i.images; track img.id) { @if ($index === active()) { <app-secure-image [fileId]="img.id" [url]="img.url" [alt]="i.title + ' photo ' + ($index + 1)" imgClass="w-full h-full object-contain" /> } }
+        </div>
+        @if (i.images.length > 1) {
+          <div class="flex gap-2 mt-3" role="tablist" aria-label="Photo thumbnails">
+            @for (img of i.images; track img.id) {
+              <button type="button" role="tab" [attr.aria-selected]="$index === active()" class="w-16 h-16 rounded-lg overflow-hidden p-0 cursor-pointer border-2" [style.border-color]="$index === active() ? 'var(--p-primary-500)' : 'transparent'" (click)="active.set($index)" [attr.aria-label]="'Show photo ' + ($index + 1)"><app-secure-image [fileId]="img.id" [url]="img.url" alt="" /></button>
+            }
+          </div>
+        }
+      } @else {
+        <div class="aspect-[4/3] rounded-xl grid place-items-center cf-muted text-center p-6" style="background: var(--cf-surface-2)"><div><i class="pi pi-image text-3xl"></i><p class="text-sm mt-2 mb-0">No photos were added to this report.</p></div></div>
+      }
+      <div class="p-3 pt-5">
+        <h2 class="cf-section-title mb-2">Description</h2>
+        <p class="m-0 leading-relaxed whitespace-pre-line">{{ i.description }}</p>
+      </div>
+    </section>
+
+    <div class="flex flex-col gap-4">
+      <section class="cf-card cf-card-pad" aria-label="Details">
+        <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 m-0 text-sm">
+          <dt class="cf-muted">Category</dt><dd class="m-0"><app-category [category]="i.category" /></dd>
+          <dt class="cf-muted">{{ i.reportType === 'lost' ? 'Lost on' : 'Found on' }}</dt><dd class="m-0">{{ i.eventDate | date: 'EEEE, d MMMM y' }}</dd>
+          <dt class="cf-muted">Location</dt><dd class="m-0">{{ i.locationName }}</dd>
+          @if (i.color) { <dt class="cf-muted">Color</dt><dd class="m-0">{{ i.color }}</dd> }
+          @if (i.brand) { <dt class="cf-muted">Brand</dt><dd class="m-0">{{ i.brand }}</dd> }
+          @if (i.distinctiveFeatures) { <dt class="cf-muted">Features</dt><dd class="m-0">{{ i.distinctiveFeatures }}</dd> }
+          @if (i.returnedAt) { <dt class="cf-muted">Returned</dt><dd class="m-0">{{ i.returnedAt | date: 'd MMM y, HH:mm' }}</dd> }
+          @if (auth.isAdmin() && i.reporter.email) { <dt class="cf-muted">Reporter</dt><dd class="m-0">{{ i.reporter.fullName }} · {{ i.reporter.studentId }}<br /><span class="cf-muted">{{ i.reporter.email }}</span></dd> }
+        </dl>
+      </section>
+      <section class="cf-card p-2 h-[260px]" aria-label="Location map">
+        <app-items-map [pins]="pins()" [zoom]="17" class="h-full" [ariaLabel]="'Map showing ' + i.locationName" />
+      </section>
+      @if (auth.isAdmin() && i.reportType === 'found') {
+        <section class="cf-card cf-card-pad" aria-labelledby="claims-h">
+          <div class="flex items-center justify-between mb-3"><h2 id="claims-h" class="cf-section-title">Claims on this item</h2><a pButton routerLink="/admin/claims" [queryParams]="{ q: i.code }" label="Review" [text]="true" size="small"></a></div>
+          @for (c of claims(); track c.id) {
+            <div class="flex items-center justify-between gap-2 py-2 border-b last:border-0" style="border-color: var(--cf-border)"><span class="text-sm">{{ c.claimant?.fullName }} <span class="cf-muted text-xs">· {{ timeAgo(c.createdAt) }}</span></span><app-claim-status [status]="c.status" /></div>
+          } @empty { <p class="m-0 text-sm cf-muted">No claims yet.</p> }
+        </section>
+      }
+    </div>
+  </div>
+  <app-file-preview [(target)]="preview" />
+}

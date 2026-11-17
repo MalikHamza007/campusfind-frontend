@@ -1,0 +1,47 @@
+<app-page-header title="Claim this item" subtitle="Tell the office why this belongs to you. Mention details only the owner would know — they compare it with the photos and the finder's report." />
+
+@if (loading()) {
+  <div class="grid lg:grid-cols-[1fr_1.3fr] gap-4"><p-skeleton height="360px" borderRadius="18px" /><p-skeleton height="360px" borderRadius="18px" /></div>
+} @else if (loadError()) {
+  <div class="cf-card"><app-error-state title="You can't claim this item" [message]="loadError()!"><a pButton routerLink="/items" label="Back to directory" icon="pi pi-arrow-left"></a></app-error-state></div>
+} @else if (item(); as i) {
+  <div class="grid grid-cols-1 lg:grid-cols-[1fr_1.3fr] gap-4 items-start">
+    <section class="cf-card p-3" aria-label="Found item">
+      <div class="aspect-[4/3] rounded-xl overflow-hidden" style="background: var(--cf-surface-2)">
+        @if (i.images[0]; as img) { <app-secure-image [fileId]="img.id" [url]="img.url" [alt]="i.title" imgClass="w-full h-full object-contain" /> } @else { <div class="w-full h-full grid place-items-center cf-muted"><i class="pi pi-image text-2xl"></i></div> }
+      </div>
+      <div class="p-3">
+        <div class="flex items-center gap-2 mb-2"><app-code-tag [code]="i.code" /><app-item-status [status]="i.status" /></div>
+        <h2 class="text-lg font-bold m-0">{{ i.title }}</h2>
+        <p class="text-sm cf-muted m-0 mt-1">Found {{ i.eventDate | date: 'd MMM y' }} · {{ i.locationName }}</p>
+        <p class="text-sm mt-3 mb-0 leading-relaxed">{{ i.description }}</p>
+      </div>
+    </section>
+    <form class="cf-card cf-card-pad flex flex-col gap-5" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="cf-field">
+        <label for="lost">Link one of your lost reports <span class="cf-muted font-normal">(optional)</span></label>
+        <p-select inputId="lost" formControlName="lostItemId" [options]="myLost()" optionLabel="label" optionValue="value" placeholder="Choose a lost report" [showClear]="true" [fluid]="true" emptyMessage="You have no open lost reports" />
+        <span class="cf-hint">Linking your earlier report helps the office confirm the dates and place match.</span>
+      </div>
+      <div class="cf-field">
+        <label for="evidence">Proof of ownership</label>
+        <textarea pTextarea id="evidence" formControlName="ownershipEvidence" rows="6" [autoResize]="true" placeholder="e.g. My initials AR are scratched on the back cover and there is a crack near the solar panel. I bought it at…" [invalid]="form.controls.ownershipEvidence.touched && form.controls.ownershipEvidence.invalid"></textarea>
+        <span class="flex justify-between">
+          @if (form.controls.ownershipEvidence.errors?.['server']) { <span class="cf-error">{{ form.controls.ownershipEvidence.errors?.['server'] }}</span> }
+          @else if (form.controls.ownershipEvidence.touched && form.controls.ownershipEvidence.invalid) { <span class="cf-error">Write at least 30 characters of evidence.</span> }
+          @else { <span class="cf-hint">At least 30 characters.</span> }
+          <span class="cf-hint tabular-nums">{{ form.value.ownershipEvidence?.length ?? 0 }}/2000</span>
+        </span>
+      </div>
+      <div class="cf-field">
+        <span class="text-[0.8125rem] font-semibold">Supporting documents <span class="cf-muted font-normal">(optional)</span></span>
+        <app-file-attacher purpose="claim_evidence" [(files)]="evidence" [max]="3" [maxBytes]="8388608" accept="image/jpeg,image/png,image/webp,application/pdf" chooseLabel="Add receipt or photo" hint="Receipts, earlier photos of the item — JPEG, PNG, WebP or PDF. Only you and the office can see them" (busyChange)="uploading.set($event)" />
+      </div>
+      @if (formError()) { <p-message severity="error" [text]="formError()!" role="alert" /> }
+      <div class="flex gap-2 justify-end">
+        <a pButton [routerLink]="['/items', i.id]" label="Cancel" [outlined]="true" severity="secondary"></a>
+        <p-button type="submit" label="Submit claim" icon="pi pi-send" [loading]="saving()" [disabled]="uploading()" />
+      </div>
+    </form>
+  </div>
+}

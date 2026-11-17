@@ -1,0 +1,122 @@
+<app-page-header title="Claim review" subtitle="Compare the finder's report, the owner's lost report and their evidence. Approve one owner, then confirm the handover when they collect it." />
+
+<section class="cf-card p-4 mb-4 flex flex-wrap gap-3 items-center" aria-label="Filters">
+  <p-iconfield class="flex-1 min-w-[240px]">
+    <p-inputicon styleClass="pi pi-search" />
+    <input pInputText [(ngModel)]="search" (ngModelChange)="typed()" placeholder="Search by item code, title, student name or ID" aria-label="Search claims" class="w-full" />
+  </p-iconfield>
+  <p-select [(ngModel)]="statusFilter" [options]="statusOptions" optionLabel="label" optionValue="value" placeholder="All statuses" [showClear]="true" (onChange)="reload()" ariaLabel="Status" class="min-w-[200px]" />
+</section>
+
+@if (error()) {
+  <div class="cf-card"><app-error-state [message]="error()!"><p-button label="Try again" icon="pi pi-refresh" (onClick)="fetch()" /></app-error-state></div>
+} @else {
+  <div class="cf-card cf-table-wrap">
+    <p-table [value]="rows()" [lazy]="true" (onLazyLoad)="onLazy($event)" [paginator]="true" [rows]="limit" [totalRecords]="total()" [rowsPerPageOptions]="[10, 20, 50]" [loading]="loading()" [showLoader]="false" [rowHover]="true" responsiveLayout="stack" [breakpoint]="'900px'">
+      <ng-template #header><tr><th>Found item</th><th>Claimant</th><th>Linked lost report</th><th>Submitted</th><th>Status</th><th class="text-right">Actions</th></tr></ng-template>
+      <ng-template #body let-c>
+        <tr class="cursor-pointer" (click)="review(c)">
+          <td><div class="flex flex-col gap-1"><span class="font-semibold">{{ c.foundItem?.title }}</span><app-code-tag [code]="c.foundItem?.code ?? ''" /></div></td>
+          <td><p class="m-0 text-sm font-medium">{{ c.claimant?.fullName }}</p><p class="m-0 text-xs cf-muted">{{ c.claimant?.studentId }} · {{ c.claimant?.department }}</p></td>
+          <td class="text-sm">@if (c.lostItem) { {{ c.lostItem.code }} } @else { <span class="cf-muted">—</span> }</td>
+          <td class="text-sm">{{ timeAgo(c.createdAt) }}</td>
+          <td><app-claim-status [status]="c.status" /></td>
+          <td class="text-right whitespace-nowrap" (click)="$event.stopPropagation()">
+            <p-button icon="pi pi-search-plus" [text]="true" [rounded]="true" pTooltip="Review evidence" (onClick)="review(c)" ariaLabel="Review claim" />
+            @if (c.status === 'pending' || c.status === 'rejected') { <p-button icon="pi pi-trash" [text]="true" [rounded]="true" severity="danger" pTooltip="Delete claim" (onClick)="remove(c)" ariaLabel="Delete claim" /> }
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template #emptymessage>
+        <tr><td colspan="6">
+          @if (loading()) { <div class="flex flex-col gap-2">@for (s of [1,2,3,4]; track s) { <p-skeleton height="2.75rem" /> }</div> }
+          @else { <app-empty-state [title]="statusFilter === 'pending' ? 'No claims waiting for review' : 'No claims match'" message="New ownership claims show up here as soon as students submit them." /> }
+        </td></tr>
+      </ng-template>
+    </p-table>
+  </div>
+}
+
+<p-dialog [visible]="!!selected()" (visibleChange)="!$event && closeReview()" [modal]="true" [style]="{ width: 'min(1100px, 96vw)' }" [draggable]="false" [dismissableMask]="true" [header]="'Review claim — ' + (selected()?.foundItem?.code ?? '')">
+  @if (selected(); as c) {
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <!-- found item -->
+      <section class="rounded-xl p-3" style="background: var(--cf-surface-2)" aria-label="Finder's report">
+        <p class="text-xs font-semibold cf-muted m-0 mb-2">Finder's report</p>
+        @if (found(); as f) {
+          <div class="aspect-[4/3] rounded-lg overflow-hidden mb-3" style="background: var(--cf-surface)">@if (f.images[0]; as img) { <app-secure-image [fileId]="img.id" [url]="img.url" [alt]="f.title" imgClass="w-full h-full object-contain" /> } @else { <div class="w-full h-full grid place-items-center cf-muted"><i class="pi pi-image"></i></div> }</div>
+          <div class="flex items-center gap-2 mb-1"><app-code-tag [code]="f.code" /><app-item-status [status]="f.status" /></div>
+          <p class="font-semibold m-0">{{ f.title }}</p>
+          <p class="text-xs cf-muted m-0 mt-1">{{ f.eventDate | date: 'd MMM y' }} · {{ f.locationName }}</p>
+          <p class="text-sm mt-2 mb-0">{{ f.description }}</p>
+          @if (f.distinctiveFeatures || f.color || f.brand) { <p class="text-xs mt-2 mb-0"><strong>Details:</strong> {{ details(f) }}</p> }
+          <a [routerLink]="['/items', f.id]" class="text-xs font-semibold mt-2 inline-block" style="color: var(--p-primary-600)">Open full report</a>
+        } @else if (reviewLoading()) { <p-skeleton height="260px" /> }
+      </section>
+      <!-- lost report -->
+      <section class="rounded-xl p-3" style="background: var(--cf-surface-2)" aria-label="Owner's lost report">
+        <p class="text-xs font-semibold cf-muted m-0 mb-2">Owner's lost report</p>
+        @if (lost(); as l) {
+          <div class="flex items-center gap-2 mb-1"><app-code-tag [code]="l.code" /><app-item-status [status]="l.status" /></div>
+          <p class="font-semibold m-0">{{ l.title }}</p>
+          <p class="text-xs cf-muted m-0 mt-1">Lost {{ l.eventDate | date: 'd MMM y' }} · {{ l.locationName }}</p>
+          <p class="text-sm mt-2 mb-0">{{ l.description }}</p>
+          @if (l.distinctiveFeatures || l.color || l.brand) { <p class="text-xs mt-2 mb-0"><strong>Details:</strong> {{ details(l) }}</p> }
+          @if (found(); as f) {
+            <ul class="list-none p-0 m-0 mt-3 flex flex-col gap-1 text-xs">
+              <li><i [class]="f.locationName === l.locationName ? 'pi pi-check-circle' : 'pi pi-minus-circle'" [style.color]="f.locationName === l.locationName ? 'var(--cf-found)' : 'var(--cf-muted)'"></i> Same location</li>
+              <li><i [class]="f.category === l.category ? 'pi pi-check-circle' : 'pi pi-minus-circle'" [style.color]="f.category === l.category ? 'var(--cf-found)' : 'var(--cf-muted)'"></i> Same category</li>
+              <li><i class="pi pi-calendar"></i> Lost {{ l.eventDate | date: 'd MMM' }}, found {{ f.eventDate | date: 'd MMM' }}</li>
+            </ul>
+          }
+        } @else { <p class="text-sm cf-muted m-0">The claimant didn't link a lost report.</p> }
+      </section>
+      <!-- evidence -->
+      <section class="rounded-xl p-3 flex flex-col gap-3" style="background: var(--cf-surface-2)" aria-label="Claimant evidence">
+        <div>
+          <p class="text-xs font-semibold cf-muted m-0 mb-2">Claimant</p>
+          <p class="m-0 font-semibold">{{ c.claimant?.fullName }}</p>
+          <p class="m-0 text-xs cf-muted">{{ c.claimant?.studentId }} · {{ c.claimant?.department }} · {{ c.claimant?.email }}</p>
+        </div>
+        <div><p class="text-xs font-semibold cf-muted m-0 mb-1">Evidence</p><p class="m-0 text-sm leading-relaxed">{{ c.ownershipEvidence }}</p></div>
+        @if (c.evidence.length) {
+          <div class="flex flex-col gap-2">
+            @for (f of c.evidence; track f.id) {
+              <button type="button" class="flex items-center gap-3 p-2 rounded-lg border-0 cursor-pointer text-left" style="background: var(--cf-surface)" (click)="preview.set(f)" [attr.aria-label]="'Preview ' + f.originalName">
+                <span class="cf-thumb">@if (f.mimeType.startsWith('image/')) { <app-secure-image [fileId]="f.id" [url]="f.url" [alt]="f.originalName" /> } @else { <i class="pi pi-file-pdf" style="color: var(--cf-lost)"></i> }</span>
+                <span class="text-sm truncate">{{ f.originalName }}</span><i class="pi pi-external-link text-xs cf-muted ml-auto"></i>
+              </button>
+            }
+          </div>
+        } @else { <p class="text-xs cf-muted m-0">No documents attached.</p> }
+        <app-claim-timeline [claim]="c" />
+      </section>
+    </div>
+
+    @if (decision(); as d) {
+      <div class="mt-4 p-4 rounded-xl border" style="border-color: var(--cf-border)">
+        <label for="note" class="text-sm font-semibold block mb-2">{{ d === 'approve' ? 'Note for the student (optional)' : d === 'reject' ? 'Reason for rejection (shown to the student)' : 'Handover note (optional)' }}</label>
+        <textarea pTextarea id="note" [(ngModel)]="note" rows="3" class="w-full" [placeholder]="d === 'return' ? 'e.g. Collected at the office, CNIC checked' : d === 'reject' ? 'e.g. The initials on the back do not match' : 'e.g. Bring your university ID to the office'"></textarea>
+        @if (d === 'approve') { <p class="text-xs cf-muted mt-2 mb-0">Approving matches the item to this student. Any other pending claims on this item will be closed automatically.</p> }
+        @if (d === 'return') { <p class="text-xs cf-muted mt-2 mb-0">Confirm only after the student has collected the item in person.</p> }
+      </div>
+    }
+    @if (actionError()) { <p-message severity="error" styleClass="mt-3" [text]="actionError()!" role="alert" /> }
+  }
+  <ng-template #footer>
+    @if (selected(); as c) {
+      @if (decision()) {
+        <p-button label="Back" [text]="true" severity="secondary" (onClick)="decision.set(null)" />
+        <p-button [label]="decision() === 'approve' ? 'Approve claim' : decision() === 'reject' ? 'Reject claim' : 'Confirm handover'" [severity]="decision() === 'reject' ? 'danger' : 'primary'" icon="pi pi-check" [loading]="acting()" (onClick)="act()" />
+      } @else {
+        <p-button label="Close" [text]="true" severity="secondary" (onClick)="closeReview()" />
+        @if (c.status === 'pending') {
+          <p-button label="Reject" icon="pi pi-times" severity="danger" [outlined]="true" (onClick)="start('reject')" />
+          <p-button label="Approve" icon="pi pi-check" (onClick)="start('approve')" />
+        }
+        @if (c.status === 'approved') { <p-button label="Mark returned" icon="pi pi-box" (onClick)="start('return')" /> }
+      }
+    }
+  </ng-template>
+</p-dialog>
+<app-file-preview [(target)]="preview" />
