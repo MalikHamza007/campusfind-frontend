@@ -1,0 +1,105 @@
+@layer theme, base, primeng, components, utilities;
+@import "tailwindcss";
+@custom-variant dark (&:where(.app-dark, .app-dark *));
+
+/* ---------- CampusFind tokens ---------- */
+:root {
+  --cf-ink: #0f3d38;          /* pine ink: hero, sidebar brand */
+  --cf-ink-2: #145c53;
+  --cf-tag: #f4c95d;          /* manila luggage-tag yellow: item codes */
+  --cf-tag-ink: #4a3a10;
+  --cf-lost: #c8385a;         /* raspberry: lost reports */
+  --cf-found: #1f9e89;        /* signal teal: found reports */
+  --cf-bg: #f3f6f7;
+  --cf-surface: #ffffff;
+  --cf-surface-2: #f8fafb;
+  --cf-border: #e2e8eb;
+  --cf-text: #16232a;
+  --cf-muted: #5d6f78;
+  --cf-shadow: 0 1px 2px rgb(15 61 56 / 0.06), 0 8px 24px -12px rgb(15 61 56 / 0.18);
+  --cf-radius-lg: 18px;
+  --cf-radius: 12px;
+  color-scheme: light;
+}
+.app-dark {
+  --cf-bg: #0b1317;
+  --cf-surface: #121d23;
+  --cf-surface-2: #17242b;
+  --cf-border: #24343c;
+  --cf-text: #e6eef1;
+  --cf-muted: #93a6ae;
+  --cf-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 30px -14px rgb(0 0 0 / 0.7);
+  color-scheme: dark;
+}
+
+@layer base {
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    background: var(--cf-bg);
+    color: var(--cf-text);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { letter-spacing: -0.015em; }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--p-primary-500); outline-offset: 2px; }
+}
+
+@layer components {
+  /* boot splash (index.html) */
+  .boot-splash { min-height: 100vh; display: grid; place-content: center; gap: 12px; text-align: center; color: #5d6f78; font: 500 14px Inter, system-ui, sans-serif; }
+  .boot-tag { display: inline-flex; align-items: center; gap: 10px; padding: 10px 18px 10px 12px; border-radius: 6px 14px 14px 6px; background: #f4c95d; color: #0f3d38; font-weight: 800; font-size: 20px; animation: cf-swing 1.6s ease-in-out infinite; transform-origin: 0 50%; }
+  .boot-tag span { width: 10px; height: 10px; border-radius: 50%; background: #0f3d38; }
+  @keyframes cf-swing { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+
+  .cf-card { background: var(--cf-surface); border: 1px solid var(--cf-border); border-radius: var(--cf-radius-lg); box-shadow: var(--cf-shadow); }
+  .cf-card-pad { padding: 20px; }
+  @media (min-width: 768px) { .cf-card-pad { padding: 24px; } }
+  .cf-muted { color: var(--cf-muted); }
+  .cf-section-title { font-size: 1rem; font-weight: 700; margin: 0; }
+  .cf-section-sub { font-size: 0.8125rem; color: var(--cf-muted); margin: 2px 0 0; }
+
+  /* the luggage tag: item codes everywhere */
+  .cf-code-tag {
+    position: relative; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    padding: 3px 10px 3px 18px; border-radius: 4px 9px 9px 4px; background: var(--cf-tag); color: var(--cf-tag-ink);
+    font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+    clip-path: polygon(8px 0, 100% 0, 100% 100%, 8px 100%, 0 50%);
+  }
+  .cf-code-tag::before { content: ''; position: absolute; left: 8px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: var(--cf-surface); }
+  .cf-type-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+  .cf-type-lost { background: var(--cf-lost); }
+  .cf-type-found { background: var(--cf-found); }
+  .cf-type-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .cf-type-pill.lost { color: var(--cf-lost); background: color-mix(in srgb, var(--cf-lost) 12%, transparent); }
+  .cf-type-pill.found { color: var(--cf-found); background: color-mix(in srgb, var(--cf-found) 14%, transparent); }
+
+  .cf-field { display: flex; flex-direction: column; gap: 6px; }
+  .cf-field > label { font-size: 0.8125rem; font-weight: 600; }
+  .cf-error { font-size: 0.75rem; color: var(--p-red-500); }
+  .cf-hint { font-size: 0.75rem; color: var(--cf-muted); }
+
+  .cf-thumb { width: 44px; height: 44px; border-radius: 10px; overflow: hidden; background: var(--cf-surface-2); display: grid; place-items: center; color: var(--cf-muted); flex: none; }
+  .cf-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Leaflet pins */
+  .cf-pin { width: 18px; height: 18px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: 0 2px 6px rgb(0 0 0 / 0.35); }
+  .cf-pin.lost { background: var(--cf-lost); }
+  .cf-pin.found { background: var(--cf-found); }
+  .cf-pin.pick { background: var(--cf-tag); border-color: var(--cf-ink); width: 24px; height: 24px; }
+  .leaflet-container { font-family: inherit; border-radius: var(--cf-radius); z-index: 0; }
+  .app-dark .leaflet-tile-pane { filter: brightness(0.75) contrast(1.1) saturate(0.8); }
+
+  .p-datatable .p-datatable-tbody > tr > td { vertical-align: middle; }
+  .cf-table-wrap { border-radius: var(--cf-radius-lg); overflow: hidden; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+@layer components {
+  .p-timeline-left .p-timeline-event-opposite { flex: 0 0 0; padding: 0; }
+}
