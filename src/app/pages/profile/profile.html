@@ -1,0 +1,51 @@
+<app-page-header title="My profile" subtitle="Your details are only visible to you and the lost & found office." />
+@if (user(); as u) {
+  <div class="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 items-start">
+    <section class="cf-card cf-card-pad flex flex-col items-center text-center gap-3" aria-label="Account summary">
+      <div class="w-28 h-28 rounded-full overflow-hidden grid place-items-center" style="background: var(--cf-ink)">
+        @if (u.avatarFileId) { <app-secure-image [fileId]="u.avatarFileId" [url]="u.avatar?.url" [alt]="u.fullName" /> }
+        @else { <p-avatar [label]="initials(u.fullName)" size="xlarge" shape="circle" [style]="{ background: 'var(--cf-ink)', color: 'var(--cf-tag)', width: '7rem', height: '7rem', fontSize: '2rem' }" /> }
+      </div>
+      <p-fileupload mode="basic" [customUpload]="true" [auto]="false" (onSelect)="avatar($event)" accept="image/jpeg,image/png,image/webp" [maxFileSize]="2097152" chooseLabel="Change photo" chooseIcon="pi pi-camera" [disabled]="uploadingAvatar()" />
+      <span class="cf-hint">JPEG, PNG or WebP up to 2 MB</span>
+      <div><h2 class="m-0 text-lg font-bold">{{ u.fullName }}</h2><p class="m-0 text-sm cf-muted">{{ u.email }}</p></div>
+      <div class="flex gap-2"><p-tag [value]="u.role === 'admin' ? 'Administrator' : 'Student'" [severity]="u.role === 'admin' ? 'contrast' : 'info'" [rounded]="true" /><p-tag [value]="u.studentId" severity="secondary" [rounded]="true" /></div>
+      <p class="m-0 text-xs cf-muted">Member since {{ u.createdAt | date: 'MMMM y' }}</p>
+    </section>
+    <div class="flex flex-col gap-4">
+      <form class="cf-card cf-card-pad grid sm:grid-cols-2 gap-4" [formGroup]="profile" (ngSubmit)="save()" novalidate aria-labelledby="pd-h">
+        <h2 id="pd-h" class="cf-section-title sm:col-span-2">Personal details</h2>
+        <div class="cf-field sm:col-span-2">
+          <label for="fullName">Full name</label>
+          <input pInputText id="fullName" formControlName="fullName" [invalid]="profile.controls.fullName.touched && profile.controls.fullName.invalid" />
+          @if (profile.controls.fullName.touched && profile.controls.fullName.invalid) { <span class="cf-error">2–80 characters.</span> }
+        </div>
+        <div class="cf-field"><label for="department">Department</label><p-select inputId="department" formControlName="department" [options]="departments" [fluid]="true" /></div>
+        <div class="cf-field">
+          <label for="phone">Phone</label>
+          <input pInputText id="phone" formControlName="phone" placeholder="+92 300 1234 567" [invalid]="profile.controls.phone.touched && profile.controls.phone.invalid" />
+          @if (profile.controls.phone.touched && profile.controls.phone.invalid) { <span class="cf-error">Enter a valid phone number.</span> }
+        </div>
+        <div class="cf-field"><label for="email">Email</label><input pInputText id="email" [value]="u.email" disabled /><span class="cf-hint">Email and student ID can only be changed by the office.</span></div>
+        <div class="sm:col-span-2 flex justify-end"><p-button type="submit" label="Save details" icon="pi pi-check" [loading]="saving()" [disabled]="profile.pristine" /></div>
+      </form>
+      <form class="cf-card cf-card-pad grid sm:grid-cols-2 gap-4" [formGroup]="password" (ngSubmit)="changePassword()" novalidate aria-labelledby="pw-h">
+        <div class="sm:col-span-2"><h2 id="pw-h" class="cf-section-title">Change password</h2><p class="cf-section-sub">Changing it signs you out on every other device.</p></div>
+        <div class="cf-field">
+          <label for="current">Current password</label>
+          <p-password inputId="current" formControlName="currentPassword" [feedback]="false" [toggleMask]="true" autocomplete="current-password" [fluid]="true" />
+          @if (password.controls.currentPassword.errors?.['server']) { <span class="cf-error">{{ password.controls.currentPassword.errors?.['server'] }}</span> }
+        </div>
+        <div class="cf-field">
+          <label for="new">New password</label>
+          <p-password inputId="new" formControlName="newPassword" [feedback]="false" [toggleMask]="true" autocomplete="new-password" [fluid]="true" />
+          <ul class="m-0 p-0 list-none grid grid-cols-2 gap-x-3 gap-y-1 text-xs mt-1">@for (r of rules; track r.key) { <li [style.color]="passed(r.test) ? 'var(--cf-found)' : 'var(--cf-muted)'"><i [class]="passed(r.test) ? 'pi pi-check-circle' : 'pi pi-circle'" class="text-[11px] mr-1"></i>{{ r.label }}</li> }</ul>
+        </div>
+        @if (pwError()) { <p-message severity="error" [text]="pwError()!" styleClass="sm:col-span-2" /> }
+        <div class="sm:col-span-2 flex justify-end"><p-button type="submit" label="Change password" icon="pi pi-lock" [loading]="savingPw()" /></div>
+      </form>
+    </div>
+  </div>
+} @else {
+  <div class="grid lg:grid-cols-[320px_1fr] gap-4"><div class="cf-card h-[360px] animate-pulse"></div><div class="cf-card h-[360px] animate-pulse"></div></div>
+}
